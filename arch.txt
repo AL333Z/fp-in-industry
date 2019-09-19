@@ -1,0 +1,12 @@
++-----------------+               +---------------+
+| Order Managment |               | Order History |
+|    System       +-------------->+   Projector   |
++-----------------+   domain      +-------+-------+
+                      events              |             +----------------+
+                                          |             | Order History  |
+                                          |             |     API        |
+                                          v             +-----+----------+
+                                  +-------+-------+           |
+                                  | Order History |    query  |
+                                  |   Projection  +<----------+
+                                  +---------------+

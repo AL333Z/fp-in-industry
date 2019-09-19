@@ -1,0 +1,12 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date{"yyyy-MM-dd'T'HH:mm:ss.SSSZ", UTC} [%thread] %-5level %logger{15} - %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+    <variable name="LOG_LEVEL" value="${LOG_LEVEL:-INFO}"/>
+    <root level="${LOG_LEVEL}">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
