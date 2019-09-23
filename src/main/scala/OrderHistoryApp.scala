@@ -1,10 +1,13 @@
 import cats.effect.{ ExitCode, IO, IOApp, Resource }
 import cats.implicits._
+import mongo.Mongo
 import org.http4s.implicits._
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
 
 object OrderHistoryApp extends IOApp {
+
+  val mongoConfig = Mongo.Config.load
 
   def run(args: List[String]): IO[ExitCode] =
     Resource.make(IO(()))(_ => IO.unit).use { _ =>

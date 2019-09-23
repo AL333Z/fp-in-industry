@@ -49,8 +49,7 @@ scalacOptions ++= Seq(
   "-Ywarn-unused:locals", // Warn if a local definition is unused.
   "-Ywarn-unused:params", // Warn if a value parameter is unused.
   "-Ywarn-unused:patvars", // Warn if a variable bound in a pattern is unused.
-  "-Ywarn-unused:privates", // Warn if a private member is unused.
-  "-Ywarn-value-discard" // Warn when non-Unit expression results are unused.
+  "-Ywarn-unused:privates" // Warn if a private member is unused.
 )
 
 addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")
@@ -63,7 +62,8 @@ libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-blaze-client" % Http4sVersion % Test
 )
 
-libraryDependencies += "dev.profunktor" % "fs2-rabbit_2.12" % "2.0.0"
+libraryDependencies += "dev.profunktor"    % "fs2-rabbit_2.12"     % "2.0.0"
+libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"
 
 val CirceVersion = "0.11.1"
 libraryDependencies += "io.circe" %% "circe-core"    % CirceVersion
