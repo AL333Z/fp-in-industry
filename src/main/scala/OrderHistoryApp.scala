@@ -1,5 +1,4 @@
-import cats.effect.{ ExitCode, IO, IOApp, Resource }
-import cats.implicits._
+import cats.effect.{ ExitCode, IO, IOApp }
 import mongo.Mongo
 import org.http4s.implicits._
 import org.http4s.server.blaze.BlazeServerBuilder
@@ -7,20 +6,21 @@ import org.http4s.server.middleware.Logger
 
 object OrderHistoryApp extends IOApp {
 
-  val mongoConfig = Mongo.Config.load
-
   def run(args: List[String]): IO[ExitCode] =
-    Resource.make(IO(()))(_ => IO.unit).use { _ =>
-      val orderRepo    = OrderRepository.from()
-      val orderService = OrderHistoryService.from(orderRepo)
-      val loggedApp    = Logger.httpApp[IO](logHeaders = true, logBody = false)(orderService.orNotFound)
+    for {
+      mongoConfig        <- Mongo.Config.load
+      collectionResource = Mongo.collectionFrom(mongoConfig)
+      _ <- collectionResource.use { collection =>
+            val orderRepo    = OrderRepository.from(collection)
+            val orderService = OrderHistoryService.from(orderRepo)
+            val loggedApp    = Logger.httpApp[IO](logHeaders = true, logBody = true)(orderService.orNotFound)
 
-      BlazeServerBuilder[IO]
-        .bindHttp(80, "0.0.0.0")
-        .withHttpApp(loggedApp)
-        .serve
-        .compile
-        .drain
-        .as(ExitCode.Success)
-    }
+            BlazeServerBuilder[IO]
+              .bindHttp(80, "0.0.0.0")
+              .withHttpApp(loggedApp)
+              .serve
+              .compile
+              .drain
+          }
+    } yield ExitCode.Success
 }

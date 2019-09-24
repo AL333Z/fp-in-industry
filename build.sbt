@@ -62,7 +62,9 @@ libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-blaze-client" % Http4sVersion % Test
 )
 
-libraryDependencies += "dev.profunktor"    % "fs2-rabbit_2.12"     % "2.0.0"
+libraryDependencies += "dev.profunktor" % "fs2-rabbit_2.12"       % "2.0.0"
+libraryDependencies += "co.fs2"         %% "fs2-reactive-streams" % "2.0.0"
+
 libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"
 
 val CirceVersion = "0.11.1"
