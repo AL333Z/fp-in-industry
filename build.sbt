@@ -75,5 +75,6 @@ libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.8" % Test
 
+addCommandAlias("buildFmt", "all compile sbt:scalafmt scalafmt test:scalafmt")
 addCommandAlias("fmt", "all sbt:scalafmt scalafmt test:scalafmt")
 addCommandAlias("check", "all sbt:scalafmt::test scalafmt::test test:scalafmt::test")

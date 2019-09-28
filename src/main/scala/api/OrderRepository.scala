@@ -1,3 +1,5 @@
+package api
+
 import cats.effect.{ ConcurrentEffect, IO }
 import cats.implicits._
 import data.Order

@@ -1,3 +1,4 @@
+import api.{ OrderHistoryService, OrderRepository }
 import cats.effect._
 import data.params.{ Email, EnterpriseCode, OrderNo, PagingCriteria }
 import data.{ ItemId, Order, OrderLine, Price }

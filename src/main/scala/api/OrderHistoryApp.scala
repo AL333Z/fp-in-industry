@@ -1,3 +1,5 @@
+package api
+
 import cats.effect.{ ExitCode, IO, IOApp }
 import mongo.Mongo
 import org.http4s.implicits._

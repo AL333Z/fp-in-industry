@@ -1,3 +1,5 @@
+package api
+
 import cats.effect.IO
 import data.params.Email.EmailQueryParam
 import data.params.EnterpriseCode.EnterpriseCodeVar
@@ -5,7 +7,7 @@ import data.params.OrderNo.OrderNoVar
 import data.params.PagingCriteriaQueryParam
 import org.http4s.HttpRoutes
 import org.http4s.circe.CirceEntityEncoder._
-import org.http4s.dsl.io._
+import org.http4s.dsl.io.{ +&, ->, /, :?, GET, NoContent, Ok, Root, _ }
 
 object OrderHistoryService {
 
