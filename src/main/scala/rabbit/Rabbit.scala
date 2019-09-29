@@ -4,9 +4,11 @@ import cats.data.NonEmptyList
 import cats.effect.{ Blocker, ConcurrentEffect, ContextShift, IO, Resource }
 import dev.profunktor.fs2rabbit.config.declaration.{ DeclarationQueueConfig, Durable, NonAutoDelete, NonExclusive }
 import dev.profunktor.fs2rabbit.config.{ Fs2RabbitConfig, Fs2RabbitNodeConfig }
+import dev.profunktor.fs2rabbit.effects.EnvelopeDecoder
 import dev.profunktor.fs2rabbit.interpreter.Fs2Rabbit
 import dev.profunktor.fs2rabbit.model.{ AckResult, AmqpEnvelope, BasicQos, QueueName }
 import fs2.Stream
+import projector.event.OrderCreatedEvent
 
 import scala.util.Try
 
@@ -44,10 +46,10 @@ object Rabbit {
     }
   }
 
-  def consumerFrom(config: Fs2RabbitConfig, blocker: Blocker)(
+  def consumerFrom(config: Fs2RabbitConfig, blocker: Blocker, decoder: EnvelopeDecoder[IO, Try[OrderCreatedEvent]])(
     implicit ce: ConcurrentEffect[IO],
     cs: ContextShift[IO]
-  ): Resource[IO, (AckResult => IO[Unit], Stream[IO, AmqpEnvelope[String]])] =
+  ): Resource[IO, (AckResult => IO[Unit], Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]])] =
     for {
       client    <- Resource.liftF[IO, Fs2Rabbit[IO]](Fs2Rabbit[IO](config, blocker))
       channel   <- client.createConnectionChannel
@@ -57,8 +59,10 @@ object Rabbit {
               .declareQueue(DeclarationQueueConfig(queueName, Durable, NonExclusive, NonAutoDelete, Map.empty))(channel)
           )
       (acker, consumer) <- Resource.liftF(
-                            client.createAckerConsumer[String](queueName, BasicQos(0, 10))(channel,
-                                                                                           AmqpEnvelope.stringDecoder)
+                            client.createAckerConsumer[Try[OrderCreatedEvent]](queueName, BasicQos(0, 10))(
+                              channel,
+                              decoder
+                            )
                           )
     } yield (acker, consumer)
 }
