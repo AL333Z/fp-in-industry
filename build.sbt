@@ -72,6 +72,7 @@ libraryDependencies += "io.circe" %% "circe-core"    % CirceVersion
 libraryDependencies += "io.circe" %% "circe-generic" % CirceVersion
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+libraryDependencies += "io.chrisdavenport" %% "log4cats-slf4j"   % "1.0.0"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.8" % Test
 

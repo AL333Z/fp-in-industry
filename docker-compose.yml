@@ -2,23 +2,24 @@
 version: '3.1'
 
 services:
-  api:
-    image: lustefaniak/sbt:adoptopenjdk8_1.2.8_2.12.8
-    ports:
-      - "80:80"
-    expose:
-      - "80"
-    volumes:
-      - .:/app
-      - ~/.ivy2:/tmp/.ivy2
-      - ~/.sbt:/tmp/.sbt
-    depends_on:
-      - mongo
-    tty: true
-    environment:
-      MONGO_USERNAME: root
-      MONGO_PASSWORD: example
-    command: sbt run
+#  api:
+#    image: lustefaniak/sbt:adoptopenjdk8_1.2.8_2.12.8
+#    ports:
+#      - "80:80"
+#    expose:
+#      - "80"
+#    volumes:
+#      - .:/app
+#      - ~/.ivy2:/tmp/.ivy2
+#      - ~/.sbt:/tmp/.sbt
+#    depends_on:
+#      - mongo
+#      - rabbit
+#    tty: true
+#    environment:
+#      MONGO_USERNAME: root
+#      MONGO_PASSWORD: example
+#    command: sbt run
 
   mongo:
     image: mongo
@@ -30,3 +31,12 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
+
+  rabbit:
+    image: rabbitmq:3-management
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    expose:
+      - "15672"
+      - "5672"

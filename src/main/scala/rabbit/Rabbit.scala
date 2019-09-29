@@ -5,7 +5,7 @@ import cats.effect.{ Blocker, ConcurrentEffect, ContextShift, IO, Resource }
 import dev.profunktor.fs2rabbit.config.declaration.{ DeclarationQueueConfig, Durable, NonAutoDelete, NonExclusive }
 import dev.profunktor.fs2rabbit.config.{ Fs2RabbitConfig, Fs2RabbitNodeConfig }
 import dev.profunktor.fs2rabbit.interpreter.Fs2Rabbit
-import dev.profunktor.fs2rabbit.model.{ AckResult, AmqpEnvelope, QueueName }
+import dev.profunktor.fs2rabbit.model.{ AckResult, AmqpEnvelope, BasicQos, QueueName }
 import fs2.Stream
 
 import scala.util.Try
@@ -57,7 +57,8 @@ object Rabbit {
               .declareQueue(DeclarationQueueConfig(queueName, Durable, NonExclusive, NonAutoDelete, Map.empty))(channel)
           )
       (acker, consumer) <- Resource.liftF(
-                            client.createAckerConsumer[String](queueName)(channel, AmqpEnvelope.stringDecoder)
+                            client.createAckerConsumer[String](queueName, BasicQos(0, 10))(channel,
+                                                                                           AmqpEnvelope.stringDecoder)
                           )
     } yield (acker, consumer)
 }
