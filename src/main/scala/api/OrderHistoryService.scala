@@ -1,8 +1,8 @@
 package api
 
 import cats.effect.IO
+import data.params.Company.CompanyVar
 import data.params.Email.EmailQueryParam
-import data.params.EnterpriseCode.EnterpriseCodeVar
 import data.params.OrderNo.OrderNoVar
 import data.params.PagingCriteriaQueryParam
 import org.http4s.HttpRoutes
@@ -12,20 +12,20 @@ import org.http4s.dsl.io.{ +&, ->, /, :?, GET, NoContent, Ok, Root, _ }
 object OrderHistoryService {
 
   def from(orderRepository: OrderRepository): HttpRoutes[IO] = HttpRoutes.of[IO] {
-    case GET -> Root / EnterpriseCodeVar(enterpriseCode) / "orders"
+    case GET -> Root / CompanyVar(company) / "orders"
           :? EmailQueryParam(email)
             +& PagingCriteriaQueryParam(pagingCriteria) =>
       orderRepository
         .findBy(
           email = email,
-          enterpriseCode = enterpriseCode,
+          company = company,
           pagingCriteria = pagingCriteria
         )
         .flatMap(Ok(_))
 
-    case GET -> Root / EnterpriseCodeVar(enterpriseCode) / "orders" / OrderNoVar(orderNo) / "details" =>
+    case GET -> Root / CompanyVar(company) / "orders" / OrderNoVar(orderNo) / "details" =>
       orderRepository
-        .findBy(enterpriseCode, orderNo)
+        .findBy(company, orderNo)
         .flatMap {
           case Some(order) => Ok(order)
           case None        => NoContent()

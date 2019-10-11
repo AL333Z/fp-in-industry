@@ -1,7 +1,7 @@
 package data
 
 import cats.implicits._
-import data.params.{ Email, OrderNo }
+import data.params.{ Company, Email, OrderNo }
 import io.circe.generic.semiauto._
 import io.circe.{ Encoder, Json }
 import org.mongodb.scala.bson.collection.immutable.Document
@@ -11,6 +11,7 @@ import scala.util.Try
 
 case class Order(
   orderNo: OrderNo,
+  company: Company,
   email: Email,
   lines: List[OrderLine]
 )
@@ -30,17 +31,12 @@ object Order {
 
   def fromBson(doc: Document): Try[Order] =
     for {
-      lineDocs <- Try(
-                   doc // FIXME too ugly to be real..
-                     .getList("lines", Document.getClass)
-                     .asInstanceOf[java.util.List[Document]]
-                     .asScala
-                     .toList
-                 )
-      lines <- lineDocs.traverse[Try, OrderLine](OrderLine.fromBson)
+      lineDocs <- Try(doc("lines").asArray().asScala.toList.map(x => Document(x.asDocument())))
+      lines    <- lineDocs.traverse[Try, OrderLine](OrderLine.fromBson)
       order <- Try(
                 Order(
-                  OrderNo(doc.getString("orderNo")),
+                  OrderNo(doc.getString("id")),
+                  Company(doc.getString("company")),
                   Email(doc.getString("email")),
                   lines
                 )
@@ -53,9 +49,9 @@ object OrderLine {
 
   def fromBson(doc: Document): Try[OrderLine] = Try {
     OrderLine(
-      doc.getInteger("lineNo"),
-      ItemId(doc.getString("itemId")),
-      Price(BigDecimal(doc.getDouble("price")))
+      doc.getInteger("no"),
+      ItemId(doc.getString("item")),
+      Price(doc("price").asDecimal128().getValue.bigDecimalValue())
     )
   }
 }

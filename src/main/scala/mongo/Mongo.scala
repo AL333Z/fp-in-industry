@@ -2,10 +2,17 @@ package mongo
 
 import java.util.concurrent.TimeUnit
 
-import cats.effect.{ IO, Resource }
+import cats.effect.{ ConcurrentEffect, IO, Resource }
 import cats.implicits._
 import org.mongodb.scala.connection.{ ClusterSettings, SocketSettings }
-import org.mongodb.scala.{ Document, MongoClient, MongoClientSettings, MongoCollection, MongoCredential, ServerAddress }
+import org.mongodb.scala.{
+  MongoClient,
+  MongoClientSettings,
+  MongoCredential,
+  Observer,
+  ServerAddress,
+  SingleObservable
+}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
@@ -37,7 +44,7 @@ object Mongo {
     }
   }
 
-  def collectionFrom(conf: Config): Resource[IO, MongoCollection[Document]] = {
+  def collectionFrom(conf: Config)(implicit ce: ConcurrentEffect[IO]): Resource[IO, Collection] = {
 
     val addresses: List[ServerAddress] = conf.serverAddresses.map(new ServerAddress(_, conf.serverPort))
     val maybeCredential: Option[MongoCredential] = conf.auth.map(
@@ -58,6 +65,20 @@ object Mongo {
         }
       )
       .map(_.getDatabase(conf.databaseName).getCollection(conf.collectionName))
+      .map(new Collection(_))
   }
 
+  implicit class SingleObservableToIO[A](val inner: SingleObservable[A]) extends AnyVal {
+
+    def toIO: IO[A] =
+      IO.async(
+        k =>
+          inner
+            .subscribe(new Observer[A] {
+              override def onNext(result: A): Unit     = k(result.asRight[Throwable])
+              override def onError(e: Throwable): Unit = k(e.asLeft)
+              override def onComplete(): Unit          = ()
+            })
+      )
+  }
 }

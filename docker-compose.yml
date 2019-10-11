@@ -1,26 +1,6 @@
-# Use root/example as user/password credentials
 version: '3.1'
 
 services:
-#  api:
-#    image: lustefaniak/sbt:adoptopenjdk8_1.2.8_2.12.8
-#    ports:
-#      - "80:80"
-#    expose:
-#      - "80"
-#    volumes:
-#      - .:/app
-#      - ~/.ivy2:/tmp/.ivy2
-#      - ~/.sbt:/tmp/.sbt
-#    depends_on:
-#      - mongo
-#      - rabbit
-#    tty: true
-#    environment:
-#      MONGO_USERNAME: root
-#      MONGO_PASSWORD: example
-#    command: sbt run
-
   mongo:
     image: mongo
     ports:

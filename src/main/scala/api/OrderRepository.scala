@@ -4,54 +4,48 @@ import cats.effect.{ ConcurrentEffect, IO }
 import cats.implicits._
 import data.Order
 import data.params._
-import fs2.interop.reactivestreams._
-import mongo.ReactiveStreams._
-import org.mongodb.scala.{ Document, MongoCollection }
+import mongo.Collection
+import org.mongodb.scala.Document
 
 trait OrderRepository {
-  def findBy(email: Email, enterpriseCode: EnterpriseCode, pagingCriteria: PagingCriteria): IO[List[Order]]
+  def findBy(email: Email, company: Company, pagingCriteria: PagingCriteria): IO[List[Order]]
 
-  def findBy(enterpriseCode: EnterpriseCode, orderNo: OrderNo): IO[Option[Order]]
+  def findBy(company: Company, orderNo: OrderNo): IO[Option[Order]]
 }
 
 object OrderRepository {
 
-  def from(collection: MongoCollection[Document])(implicit ce: ConcurrentEffect[IO]): OrderRepository =
+  def from(collection: Collection)(implicit ce: ConcurrentEffect[IO]): OrderRepository =
     new OrderRepository {
 
       def findBy(
         email: Email,
-        enterpriseCode: EnterpriseCode,
+        company: Company,
         pagingCriteria: PagingCriteria
       ): IO[List[Order]] =
         collection
           .find(
-            Document(
-              "email"          -> email.value,
-              "enterpriseCode" -> enterpriseCode.value
-            )
+            document = Document(
+              "email"   -> email.value,
+              "company" -> company.value
+            ),
+            skip = pagingCriteria.pageNo.value * pagingCriteria.pageSize.value,
+            limit = pagingCriteria.pageSize.value
           )
-          .skip(pagingCriteria.pageNo.value * pagingCriteria.pageSize.value)
-          .limit(pagingCriteria.pageSize.value)
-          .toPublisher // FIXME avoid Publisher -> Stream -> IO[List]
-          .toStream[IO]()
           .compile
           .toList
           .flatMap(
             _.traverse(doc => IO.fromTry(Order.fromBson(doc)))
           )
 
-      def findBy(enterpriseCode: EnterpriseCode, orderNo: OrderNo): IO[Option[Order]] =
+      def findBy(company: Company, orderNo: OrderNo): IO[Option[Order]] =
         collection
-          .find(
+          .findFirst(
             Document(
-              "orderNo"        -> orderNo.value,
-              "enterpriseCode" -> enterpriseCode.value
+              "orderNo" -> orderNo.value,
+              "company" -> company.value
             )
           )
-          .first()
-          .toPublisher // FIXME avoid Publisher -> Stream -> IO[List]
-          .toStream[IO]()
           .compile
           .toList
           .flatMap(_ match {

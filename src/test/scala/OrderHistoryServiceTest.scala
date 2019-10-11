@@ -1,6 +1,6 @@
 import api.{ OrderHistoryService, OrderRepository }
 import cats.effect._
-import data.params.{ Email, EnterpriseCode, OrderNo, PagingCriteria }
+import data.params.{ Company, Email, OrderNo, PagingCriteria }
 import data.{ ItemId, Order, OrderLine, Price }
 import io.circe.Json
 import org.http4s._
@@ -15,6 +15,7 @@ class OrderHistoryServiceTest extends FunSuite {
     val sampleOrder: Order =
       Order(
         orderNo = OrderNo("001"),
+        company = Company("ACME"),
         email = Email("test@mail.com"),
         lines = List(
           OrderLine(
@@ -26,12 +27,10 @@ class OrderHistoryServiceTest extends FunSuite {
       )
 
     val repo: OrderRepository = new OrderRepository {
-      override def findBy(email: Email,
-                          enterpriseCode: EnterpriseCode,
-                          pagingCriteria: PagingCriteria): IO[List[Order]] =
+      override def findBy(email: Email, company: Company, pagingCriteria: PagingCriteria): IO[List[Order]] =
         IO(List(sampleOrder))
 
-      override def findBy(enterpriseCode: EnterpriseCode, orderNo: OrderNo): IO[Option[Order]] = ???
+      override def findBy(company: Company, orderNo: OrderNo): IO[Option[Order]] = ???
     }
 
     val sut = OrderHistoryService.from(repo)

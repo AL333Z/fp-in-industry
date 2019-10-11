@@ -13,6 +13,7 @@ import scala.util.Try
 
 case class OrderCreatedEvent(
   id: String,
+  company: String,
   email: String,
   lines: List[OrderLine]
 )
@@ -28,17 +29,18 @@ object OrderLine {
 }
 
 object OrderCreatedEvent {
-  //{
-  //"id": "001",
-  //"email": "asdf@asdf.com",
-  //"lines": [
-  //{
-  //"no": 1,
-  //"item": "jeans",
-  //"price": 100
-  //}
-  //]
-  //}
+//  {
+//  "id": "001",
+//  "company": "ACME",
+//  "email": "asdf@asdf.com",
+//  "lines": [
+//  {
+//  "no": 1,
+//  "item": "jeans",
+//  "price": 100
+//  }
+//  ]
+//  }
 
   implicit val orderEvtDecoder: Decoder[OrderCreatedEvent] = deriveDecoder[OrderCreatedEvent]
 

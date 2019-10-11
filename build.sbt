@@ -44,12 +44,12 @@ scalacOptions ++= Seq(
   "-Ywarn-nullary-override", // Warn when non-nullary `def f()' overrides nullary `def f'.
   "-Ywarn-nullary-unit", // Warn when nullary methods return Unit.
   "-Ywarn-numeric-widen", // Warn when numerics are widened.
-//  "-Ywarn-unused:implicits", // Warn if an implicit parameter is unused.
-//  "-Ywarn-unused:imports", // Warn if an import selector is not referenced.
-//  "-Ywarn-unused:locals", // Warn if a local definition is unused.
-//  "-Ywarn-unused:params", // Warn if a value parameter is unused.
-//  "-Ywarn-unused:patvars", // Warn if a variable bound in a pattern is unused.
-//  "-Ywarn-unused:privates" // Warn if a private member is unused.
+  "-Ywarn-unused:implicits", // Warn if an implicit parameter is unused.
+  "-Ywarn-unused:imports", // Warn if an import selector is not referenced.
+  "-Ywarn-unused:locals", // Warn if a local definition is unused.
+  "-Ywarn-unused:params", // Warn if a value parameter is unused.
+  "-Ywarn-unused:patvars", // Warn if a variable bound in a pattern is unused.
+  "-Ywarn-unused:privates" // Warn if a private member is unused.
 )
 
 addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")
@@ -62,7 +62,7 @@ libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-blaze-client" % Http4sVersion % Test
 )
 
-libraryDependencies += "dev.profunktor" %% "fs2-rabbit"       % "2.0.0"
+libraryDependencies += "dev.profunktor" %% "fs2-rabbit"           % "2.0.0"
 libraryDependencies += "co.fs2"         %% "fs2-reactive-streams" % "2.0.0"
 
 libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"
@@ -70,13 +70,15 @@ libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"
 val CirceVersion = "0.11.1"
 libraryDependencies += "io.circe" %% "circe-core"    % CirceVersion
 libraryDependencies += "io.circe" %% "circe-generic" % CirceVersion
-libraryDependencies += "io.circe" %% "circe-parser" % CirceVersion
+libraryDependencies += "io.circe" %% "circe-parser"  % CirceVersion
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
-libraryDependencies += "io.chrisdavenport" %% "log4cats-slf4j"   % "1.0.0"
+libraryDependencies += "ch.qos.logback"    % "logback-classic" % "1.2.3"
+libraryDependencies += "io.chrisdavenport" %% "log4cats-slf4j" % "1.0.0"
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.8" % Test
 
 addCommandAlias("buildFmt", "all compile sbt:scalafmt scalafmt test:scalafmt")
 addCommandAlias("fmt", "all sbt:scalafmt scalafmt test:scalafmt")
 addCommandAlias("check", "all sbt:scalafmt::test scalafmt::test test:scalafmt::test")
+
+scalafmtOnCompile := true
