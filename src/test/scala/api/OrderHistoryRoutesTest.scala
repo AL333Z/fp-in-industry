@@ -1,4 +1,5 @@
-import api.{ OrderHistoryService, OrderRepository }
+package api
+
 import cats.effect._
 import data.params.{ Company, Email, OrderNo, PagingCriteria }
 import data.{ ItemId, Order, OrderLine, Price }
@@ -8,7 +9,7 @@ import org.http4s.circe._
 import org.http4s.implicits._
 import org.scalatest.FunSuite
 
-class OrderHistoryServiceTest extends FunSuite {
+class OrderHistoryRoutesTest extends FunSuite {
 
   test("get orders") {
 
@@ -33,7 +34,7 @@ class OrderHistoryServiceTest extends FunSuite {
       override def findBy(company: Company, orderNo: OrderNo): IO[Option[Order]] = ???
     }
 
-    val sut = OrderHistoryService.from(repo)
+    val sut = OrderHistoryRoutes.from(repo)
 
     val response: IO[Response[IO]] = sut.orNotFound.run(
       Request(method = Method.GET, uri = uri"/XXX/orders?email=test@test.com")
@@ -42,13 +43,14 @@ class OrderHistoryServiceTest extends FunSuite {
     val expectedJson = Json.arr(
       Json.obj(
         ("orderNo", Json.fromString(sampleOrder.orderNo.value)),
+        ("company", Json.fromString(sampleOrder.company.value)),
         ("email", Json.fromString(sampleOrder.email.value)),
         ("lines",
          Json.arr(
            Json.obj(
              ("lineNo", Json.fromInt(sampleOrder.lines.head.lineNo)),
              ("itemId", Json.fromString(sampleOrder.lines.head.itemId.value)),
-             ("price", Json.fromBigDecimal(sampleOrder.lines.head.price.value)),
+             ("price", Json.fromBigDecimal(sampleOrder.lines.head.price.value))
            )
          ))
       )

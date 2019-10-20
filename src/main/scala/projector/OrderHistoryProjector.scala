@@ -5,16 +5,16 @@ import cats.implicits._
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
 import dev.profunktor.fs2rabbit.model.{ AckResult, AmqpEnvelope }
 import fs2.Stream
-import mongo.{ Collection, Mongo }
-import projector.event.OrderCreatedEvent
-import rabbit.Rabbit
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import mongo.Mongo
+import projector.event.OrderCreatedEvent
+import rabbit.Rabbit
 
 import scala.util.{ Failure, Success, Try }
 
-class OrderHistoryProjector private (
-  collection: Collection,
+class OrderHistoryProjector private[projector] (
+  eventRepo: EventRepository,
   acker: AckResult => IO[Unit],
   consumer: Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]],
   logger: Logger[IO]
@@ -27,7 +27,7 @@ class OrderHistoryProjector private (
               _ <- logger.info("Received: " + envelope)
               _ <- envelope.payload match {
                     case Success(event) =>
-                      collection.insertOne(event.toDocument) *>
+                      eventRepo.store(event) *>
                         acker(AckResult.Ack(envelope.deliveryTag))
                     case Failure(e) =>
                       logger.error(e)("Error while decoding") *>
@@ -55,5 +55,6 @@ object OrderHistoryProjector {
                                         blocker,
                                         OrderCreatedEvent.orderCreatedEventEnvelopeDecoder
                                       )
-    } yield new OrderHistoryProjector(collection, rabbitAcker, rabbitConsumer, logger)
+      eventRepo = EventRepository.from(collection)
+    } yield new OrderHistoryProjector(eventRepo, rabbitAcker, rabbitConsumer, logger)
 }

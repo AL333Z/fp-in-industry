@@ -9,18 +9,14 @@ import org.http4s.HttpRoutes
 import org.http4s.circe.CirceEntityEncoder._
 import org.http4s.dsl.io.{ +&, ->, /, :?, GET, NoContent, Ok, Root, _ }
 
-object OrderHistoryService {
+object OrderHistoryRoutes {
 
   def from(orderRepository: OrderRepository): HttpRoutes[IO] = HttpRoutes.of[IO] {
     case GET -> Root / CompanyVar(company) / "orders"
           :? EmailQueryParam(email)
             +& PagingCriteriaQueryParam(pagingCriteria) =>
       orderRepository
-        .findBy(
-          email = email,
-          company = company,
-          pagingCriteria = pagingCriteria
-        )
+        .findBy(email, company, pagingCriteria)
         .flatMap(Ok(_))
 
     case GET -> Root / CompanyVar(company) / "orders" / OrderNoVar(orderNo) / "details" =>
