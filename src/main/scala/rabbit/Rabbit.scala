@@ -53,13 +53,8 @@ object Rabbit {
     for {
       client    <- Resource.liftF[IO, Fs2Rabbit[IO]](Fs2Rabbit[IO](config, blocker))
       channel   <- client.createConnectionChannel
-      queueName = QueueName("EventsFromOms")
-      _ <- Resource.liftF(
-            client
-              .declareQueue(DeclarationQueueConfig(queueName, Durable, NonExclusive, NonAutoDelete, Map.empty))(channel)
-          )
       (acker, consumer) <- Resource.liftF(
-                            client.createAckerConsumer[Try[OrderCreatedEvent]](queueName, BasicQos(0, 10))(
+                            client.createAckerConsumer[Try[OrderCreatedEvent]](QueueName("EventsFromOms"), BasicQos(0, 10))(
                               channel,
                               decoder
                             )

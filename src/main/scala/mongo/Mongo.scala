@@ -31,7 +31,7 @@ object Mongo {
 
   object Config {
 
-    val load = IO {
+    val load: IO[Config] = IO {
       val db         = "thor"
       val collection = "order_history"
       val mongoEndpoints =
@@ -40,7 +40,7 @@ object Mongo {
       val mongoUser     = Option(System.getenv("MONGO_USERNAME"))
       val mongoPassword = Option(System.getenv("MONGO_PASSWORD"))
       val auth          = (mongoUser, mongoPassword).mapN(Auth)
-      Mongo.Config(auth, mongoEndpoints, mongoPort, db, collection)
+      Config(auth, mongoEndpoints, mongoPort, db, collection)
     }
   }
 
