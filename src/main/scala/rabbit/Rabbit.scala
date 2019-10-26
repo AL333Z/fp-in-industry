@@ -2,7 +2,6 @@ package rabbit
 
 import cats.data.NonEmptyList
 import cats.effect.{ Blocker, ConcurrentEffect, ContextShift, IO, Resource }
-import dev.profunktor.fs2rabbit.config.declaration.{ DeclarationQueueConfig, Durable, NonAutoDelete, NonExclusive }
 import dev.profunktor.fs2rabbit.config.{ Fs2RabbitConfig, Fs2RabbitNodeConfig }
 import dev.profunktor.fs2rabbit.effects.EnvelopeDecoder
 import dev.profunktor.fs2rabbit.interpreter.Fs2Rabbit
@@ -51,10 +50,11 @@ object Rabbit {
     cs: ContextShift[IO]
   ): Resource[IO, (AckResult => IO[Unit], Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]])] =
     for {
-      client    <- Resource.liftF[IO, Fs2Rabbit[IO]](Fs2Rabbit[IO](config, blocker))
-      channel   <- client.createConnectionChannel
+      client  <- Resource.liftF[IO, Fs2Rabbit[IO]](Fs2Rabbit[IO](config, blocker))
+      channel <- client.createConnectionChannel
       (acker, consumer) <- Resource.liftF(
-                            client.createAckerConsumer[Try[OrderCreatedEvent]](QueueName("EventsFromOms"), BasicQos(0, 10))(
+                            client.createAckerConsumer[Try[OrderCreatedEvent]](QueueName("EventsFromOms"),
+                                                                               BasicQos(0, 10))(
                               channel,
                               decoder
                             )

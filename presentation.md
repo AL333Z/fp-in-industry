@@ -102,8 +102,7 @@ We'll just put our attention on **implementing architecture components** using P
 ```
 
 - **Consume** a *stream of events* from a RabbitMQ queue
-- **Build** a read model
-- **Persist** to a MongoDB collection
+- **Persist** a model to a MongoDB collection
 
 ---
 
@@ -130,7 +129,7 @@ A data type for **encoding side effects** as pure values, capable of expressing 
 - may support *cancellation*
  
 
-A value of type IO[A] is a computation which, when evaluated, can perform effects before returning a value of type A. 
+A value of type `IO[A]` is a computation which, when evaluated, can perform effects before returning a value of type A. 
 
 ---
 
@@ -155,9 +154,9 @@ object IO {
 }
 
 class IO[+A] {
-  def map[A, B](f: A => B): IO[B]
-  def flatMap[A, B](f: A => IO[B]): IO[B]
-  def *>[A, B](fb: IO[B]): IO[B]
+  def map[B](f: A => B): IO[B]
+  def flatMap[B](f: A => IO[B]): IO[B]
+  def *>[B](fb: IO[B]): IO[B]
   ...
 }
 ```
@@ -254,7 +253,9 @@ The projector application should:
 
 # 2. Interact with a RabbitMQ broker
 
-Not gonna reinvent the whell, just using `fs2-rabbit` lib
+Not gonna reinvent the whell, just using `fs2-rabbit` lib which:
+- provides a purely functional api
+- let me introduce you a bunch of useful data types
 
 ---
 
@@ -268,7 +269,7 @@ val channel = client.createConnectionChannel
 //  Resource[IO, AMQPChannel]
 ```
 
-What's a `Resource`?
+### What's a `Resource`?
 
 ---
 
@@ -297,8 +298,8 @@ object Resource {
 ```
 
 Extremely helpfull to write code that:
-- doesn't leak 
-- proper handles terminal signals
+- doesn't leak
+- handles properly terminal signals
 
 ---
 
@@ -324,7 +325,7 @@ object Resource {
 # Introducing Resource
 
 ```scala
-def mkResource(s: String) = {
+def mkResource(s: String): Resource[IO, String] = {
   val acquire = 
     IO(println(s"Acquiring $s")) *> IO.pure(s)
 
@@ -346,11 +347,27 @@ r.use { case (a, b) => IO(println(s"Using $a and $b")) }
 
 ---
 
+```scala
+(for {
+  outer <- mkResource("outer")
+  inner <- mkResource("inner")
+ } yield (outer, inner)
+).use { case (a, b) => IO(println(s"Using $a and $b")) }
+```
+```
+Acquiring outer
+Acquiring inner
+Using outer and inner
+Releasing inner
+Releasing outer
+```
+
 # Gotchas:
 - Nested resources are released in reverse order of acquisition 
 - Outer resources are released even if an inner use or release fails
 - Easy to lift an `AutoClosable` to `Resource`, via `Resource.fromAutoclosable`
 - You can lift any `F[A]` (`IO[A]`) into a `Resource[F, A]` (`Resource[IO, A]`) with a no-op release via `Resource.liftF`
+
 ---
 
 # 2.1. Interact with a RabbitMQ broker
@@ -380,7 +397,8 @@ r.use { case (a, b) => IO(println(s"Using $a and $b")) }
 # I hear you..
 
 ```scala
-type Consumer = Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]]
+type Consumer = 
+  Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]]
 ```
 
 ---
@@ -401,7 +419,7 @@ class Stream[F[_], +O]{
 
 - Describes an effectful computation, just like `IO`
 - Pull-based,  a consumer pulls its values by repeatedly performing one pull step at a time
-- Simplify the way we write concurrent consumers
+- Simplify the way we write concurrent streaming consumers
 
 ---
 
@@ -422,8 +440,8 @@ class Stream[+O]{
 
 ```scala 
 class OrderHistoryProjector (
-  acker: Acker,
   consumer: Consumer,
+  acker: Acker,
   logger: Logger
 ) {
  val project: IO[Unit] =
