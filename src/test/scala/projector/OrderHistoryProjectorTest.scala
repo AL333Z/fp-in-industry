@@ -32,8 +32,8 @@ class OrderHistoryProjectorTest extends FunSuite {
       ackerMock <- AckerMock()
       sut = new OrderHistoryProjector(
         eventRepo = repoMock,
-        acker = ackerMock.acker,
         consumer = consumerStub,
+        acker = ackerMock.acker,
         logger = getLogger
       )
       _      <- sut.project

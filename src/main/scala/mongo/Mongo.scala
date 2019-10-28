@@ -65,7 +65,7 @@ object Mongo {
         }
       )
       .map(_.getDatabase(conf.databaseName).getCollection(conf.collectionName))
-      .map(new Collection(_))
+      .map(Collection(_))
   }
 
   implicit class SingleObservableToIO[A](val inner: SingleObservable[A]) extends AnyVal {

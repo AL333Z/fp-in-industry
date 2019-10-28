@@ -11,7 +11,7 @@ trait EventRepository {
 
 object EventRepository {
 
-  def from(collection: Collection): EventRepository =
+  def fromCollection(collection: Collection): EventRepository =
     new EventRepository {
       override def store(event: OrderCreatedEvent): IO[Unit] =
         collection.insertOne(

@@ -8,7 +8,7 @@ import mongo.ReactiveStreams._
 import org.mongodb.scala.{ Document, MongoCollection }
 import fs2.Stream
 
-class Collection(private val wrapped: MongoCollection[Document])(implicit ce: ConcurrentEffect[IO]) {
+class Collection private (private val wrapped: MongoCollection[Document])(implicit ce: ConcurrentEffect[IO]) {
 
   def insertOne(document: Document): IO[Unit] =
     wrapped
@@ -30,4 +30,10 @@ class Collection(private val wrapped: MongoCollection[Document])(implicit ce: Co
       .first()
       .toPublisher // FIXME avoid Publisher -> Stream -> IO[List]
       .toStream[IO]()
+}
+
+object Collection {
+
+  def apply(wrapped: MongoCollection[Document])(implicit ce: ConcurrentEffect[IO]): Collection =
+    new Collection(wrapped)
 }

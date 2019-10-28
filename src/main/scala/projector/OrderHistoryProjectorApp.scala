@@ -11,7 +11,7 @@ object OrderHistoryProjectorApp extends IOApp {
       mongoConfig  <- Mongo.Config.load
       rabbitConfig <- Rabbit.Config.load
       _ <- OrderHistoryProjector
-            .from(mongoConfig, rabbitConfig)
+            .fromConfigs(mongoConfig, rabbitConfig)
             .use(_.project)
     } yield ExitCode.Success
 

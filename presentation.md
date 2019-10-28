@@ -1,3 +1,5 @@
+<!-- $theme: default -->
+
 # Why this talk?
 
 How many times have you heard/said:
@@ -322,7 +324,7 @@ object Resource {
 
 ---
 
-# Introducing Resource
+# Making a Resource
 
 ```scala
 def mkResource(s: String): Resource[IO, String] = {
@@ -334,7 +336,12 @@ def mkResource(s: String): Resource[IO, String] = {
 
   Resource.make(acquire)(release)
 }
+```
+---
 
+# Using a Resource
+
+```
 val r = for {
   outer <- mkResource("outer")
   inner <- mkResource("inner")
@@ -345,15 +352,6 @@ r.use { case (a, b) => IO(println(s"Using $a and $b")) }
 // IO[Unit]
 ```
 
----
-
-```scala
-(for {
-  outer <- mkResource("outer")
-  inner <- mkResource("inner")
- } yield (outer, inner)
-).use { case (a, b) => IO(println(s"Using $a and $b")) }
-```
 ```
 Acquiring outer
 Acquiring inner
@@ -361,6 +359,8 @@ Using outer and inner
 Releasing inner
 Releasing outer
 ```
+
+---
 
 # Gotchas:
 - Nested resources are released in reverse order of acquisition 
@@ -433,6 +433,10 @@ class Stream[+O]{
 }
 ```
 
+--- 
+
+// TODO something more on Stream
+
 ---
 
 
@@ -473,5 +477,280 @@ The projector application should:
 3. interact with a MongoDB cluster
 3.1 open a connection
 3.2 store the model to the given collection
+
+---
+
+# 3. Interact with a MongoDB cluster
+Using the official `mongo-scala-driver`, which is not exposing purely functional apis..
+
+---
+
+# How to turn an API to be _functional_?
+
+---
+
+# How to turn an API to be _functional_?
+
+In this case:
+- **wrap** the impure type
+- only **expose** the _safe_ version of its operations
+
+```scala
+class Collection(
+  private val wrapped: MongoCollection[Document]) {
+
+  def insertOne(document: Document): IO[Unit] =
+    wrapped
+      .insertOne(document)
+      .toIO // <- extension method converting to IO!
+      .void
+}
+```
+
+---
+
+# 3.1 Open a connection
+
+```scala
+object Mongo {
+  ...
+
+ def collectionFrom(conf: Config): Resource[IO, Collection] = {
+  val settings = ??? // conf to mongo-scala-driver settings
+  
+  Resource
+   .fromAutoCloseable(
+    IO.defer {
+       MongoClient(
+        settings.credential(conf.credentials).build())
+    }
+   )
+    .map(_.getDatabase(conf.databaseName)
+          .getCollection(conf.collectionName))
+    .map(new Collection(_)) // create our safe wrapper!
+ }
+}
+```
+---
+
+# The plan
+The projector application should:
+1. ~~read a bunch of configs from the env~~
+2. ~~interact with a RabbitMQ broker~~
+2.1 ~~open a connection~~
+2.2 ~~receive a Stream of events from the given queue~~
+3. interact with a MongoDB cluster
+3.1 ~~open a connection~~
+3.2 store the model to the given collection
+
+---
+
+# 3.2 Store the model to the given collection
+
+```scala 
+trait EventRepository {
+  def store(event: OrderCreatedEvent): IO[Unit]
+}
+
+object EventRepository {
+
+ def fromCollection(collection: Collection): EventRepository =
+  new EventRepository {
+   def store(event: OrderCreatedEvent): IO[Unit] =
+    collection.insertOne(
+     Document(
+       "id"      -> event.id,
+       "company" -> event.company,
+       "email"   -> event.email,
+       "lines" -> event.lines.map(
+         line => ...
+       )
+     )
+    )
+  }
+}
+```
+---
+
+# 3.2 Store the model to the given collection
+
+```scala
+class OrderHistoryProjector (
+  eventRepo: EventRepository,
+  consumer: Consumer,
+  acker: Acker,
+  logger: Logger
+) {
+ val project: IO[Unit] =
+  (for {
+   _ <- consumer.evalMap { envelope =>
+         for {
+          _ <- envelope.payload match {
+               case Success(event) =>
+                 logger.info("Received: " + envelope) *> 
+                  eventRepo.store(event) *>
+                   acker(AckResult.Ack(envelope.deliveryTag))
+               case Failure(e) =>
+                 logger.error(e)("Error while decoding") *>
+                   acker(AckResult.NAck(envelope.deliveryTag))
+               }
+         } yield ()
+       }
+  } yield ()).compile.drain
+}
+```
+
+---
+
+# The plan
+The projector application should:
+1. ~~read a bunch of configs from the env~~
+2. ~~interact with a RabbitMQ broker~~
+2.1 ~~open a connection~~
+2.2 ~~receive a Stream of events from the given queue~~
+3. ~~interact with a MongoDB cluster~~
+3.1 ~~open a connection~~
+3.2 ~~store the model to the given collection~~
+
+---
+
+# Wiring
+
+How to achieve dependency inversion?
+
+---
+
+# Wiring
+
+- Reader/Kleisli?
+- Cake pattern?
+- Dagger et similia?
+- Your favourite DI framework with xmls and reflection?
+
+---
+
+# Wiring
+
+## Constructor Injection!
+
+- I hate all the others (and yes, I tried all of them)
+- JVM application lifecycle is not so complex
+- `IO`, `SafeApp`, `Resource` are hanlding properly termination events
+ 
+---
+
+# Constructor Injection
+
+```scala
+class OrderHistoryProjector private (
+  eventRepo: EventRepository,
+  consumer: Consumer,
+  acker: Acker,
+  logger: Logger
+) {
+  ...
+}
+
+object OrderHistoryProjector {
+  def fromConfigs(mongoConfig: Mongo.Config,
+                  rabbitConfig: Fs2RabbitConfig
+  ): Resource[IO, OrderHistoryProjector] = ...
+}
+```
+
+- a class with a **private constructor** taking its deps as input
+- a companion object 
+  - with a `fromXXX` method (**smart constructor**) taking its config (or other useful params) as input
+  -  usually acquiring resources 
+  -  and returning the component as a resource itself
+
+---
+
+# Wiring - Constructor Injection
+
+```scala
+object OrderHistoryProjector {
+  def fromConfigs(
+    mongoConfig: Mongo.Config,
+    rabbitConfig: Fs2RabbitConfig
+  ): Resource[IO, OrderHistoryProjector] =
+    for {
+      collection <- Mongo.collectionFrom(mongoConfig)
+      logger     <- Resource.liftF(Slf4jLogger.create[IO])
+      (acker, consumer) <- Rabbit.consumerFrom(
+                            rabbitConfig,
+                            eventDecoder)
+      repo = EventRepository.fromCollection(collection)
+    } yield 
+       new OrderHistoryProjector(repo, consumer, acker, logger)
+}
+```
+
+- **No magic at all**, each dependency is explicitely passed in the *smart constructor* of each component.
+- Acquiring/releasing resources is handled as an *effect*
+
+---
+
+# OrderHistoryProjectorApp - Main
+
+```scala
+object OrderHistoryProjectorApp extends IOApp {
+  def run(args: List[String]): IO[ExitCode] =
+    for {
+      mongoConfig  <- Mongo.Config.load
+      rabbitConfig <- Rabbit.Config.load
+      _ <- OrderHistoryProjector
+            .fromConfigs(mongoConfig, rabbitConfig)
+            .use(_.project)
+    } yield ExitCode.Success
+}
+```
+
+- resolve configs from the environment
+- acquire the needed resources
+- start to process the stream of events
+
+---
+# Sample Architecture: Order History Service
+
+```text
++-----------------+         +---------------+
+| Order Managment |         | Order History |
+|    System       +-------->+   Projector   |
++-----------------+ domain  +-------+-------+
+                    events          |          +----------------+
+                                    |          | Order History  |
+                                    |          |     API        |
+                                    v          +-----+----------+
+                            +-------+-------+        |
+                            | Order History |  query |
+                            |   Projection  +<-------+
+                            +---------------+  
+```
+---
+
+# Let's move to the other half..
+
+---
+
+# Building an HTTP api
+
+```text
+                   +----------------+
+                   | Order History  |
+                   |     API        |
+                   +-----+----------+
++-------+-------+        |
+| Order History |  query |
+|   Projection  +<-------+
++---------------+  
+```
+
+---
+
+# You already know of to handle effects!
+
+---
+
 
 ---

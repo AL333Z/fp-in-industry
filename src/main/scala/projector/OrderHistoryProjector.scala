@@ -8,6 +8,7 @@ import fs2.Stream
 import io.chrisdavenport.log4cats.Logger
 import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
 import mongo.Mongo
+import projector.OrderHistoryProjector.{ Acker, Consumer }
 import projector.event.OrderCreatedEvent
 import rabbit.Rabbit
 
@@ -15,8 +16,8 @@ import scala.util.{ Failure, Success, Try }
 
 class OrderHistoryProjector private[projector] (
   eventRepo: EventRepository,
-  acker: AckResult => IO[Unit],
-  consumer: Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]],
+  consumer: Consumer,
+  acker: Acker,
   logger: Logger[IO]
 ) {
 
@@ -40,7 +41,10 @@ class OrderHistoryProjector private[projector] (
 
 object OrderHistoryProjector {
 
-  def from(
+  type Acker    = AckResult => IO[Unit]
+  type Consumer = Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]]
+
+  def fromConfigs(
     mongoConfig: Mongo.Config,
     rabbitConfig: Fs2RabbitConfig
   )(implicit ce: ConcurrentEffect[IO], cs: ContextShift[IO]): Resource[IO, OrderHistoryProjector] =
@@ -50,11 +54,11 @@ object OrderHistoryProjector {
       // FIXME used only for publish ops, so here it's pretty useless..
       // waiting for https://github.com/profunktor/fs2-rabbit/pull/255 to be released
       blocker <- Blocker.apply[IO]
-      (rabbitAcker, rabbitConsumer) <- Rabbit.consumerFrom(
-                                        rabbitConfig,
-                                        blocker,
-                                        OrderCreatedEvent.orderCreatedEventEnvelopeDecoder
-                                      )
-      eventRepo = EventRepository.from(collection)
-    } yield new OrderHistoryProjector(eventRepo, rabbitAcker, rabbitConsumer, logger)
+      (acker, consumer) <- Rabbit.consumerFrom(
+                            rabbitConfig,
+                            blocker,
+                            OrderCreatedEvent.orderCreatedEventEnvelopeDecoder
+                          )
+      repo = EventRepository.fromCollection(collection)
+    } yield new OrderHistoryProjector(repo, consumer, acker, logger)
 }
