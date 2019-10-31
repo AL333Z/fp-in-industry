@@ -1,12 +1,21 @@
-+-----------------+               +---------------+
-| Order Managment |               | Order History |
-|    System       +-------------->+   Projector   |
-+-----------------+   domain      +-------+-------+
-                      events              |             +----------------+
-                                          |             | Order History  |
-                                          |             |     API        |
-                                          v             +-----+----------+
-                                  +-------+-------+           |
-                                  | Order History |    query  |
-                                  |   Projection  +<----------+
-                                  +---------------+
++-----------------+         +---------------+
+|                 |         |               |
+|Order Managment  |         | Order History |
+|                 +-------->+               |
+|    Platform     |         |   Projector   |
+|                 | domain  |               |
++-----------------+         +-------+-------+
+                    events          |          +----------------+
+                                    |          |                |
+                                    |          | Order History  |
+                                    |          |                |
+                                    |          |     API        |
+                                    |          |                |
+                                    v          +-----+----------+
+                            +-------+-------+        |
+                            |               | query  |
+                            | Order History |        |
+                            |               +<-------+
+                            |   Projection  |
+                            |               |
+                            +---------------+

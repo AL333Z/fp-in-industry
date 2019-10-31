@@ -17,9 +17,11 @@ object Email {
   private def validate(x: String): Option[String] =
     """(\w+)@([\w\.]+)""".r.findFirstIn(x)
 
-  implicit val emailQueryParamDecoder: QueryParamDecoder[Email] = (value: QueryParameterValue) =>
-    validate(value.value).map(Email(_)).toValidNel(ParseFailure("Invalid Email", value.value))
-
-  object EmailQueryParam extends QueryParamDecoderMatcher[Email]("email")
+  implicit val emailQueryParamDecoder: QueryParamDecoder[Email] = (value: QueryParameterValue) => {
+    validate(value.value)
+      .map(Email(_))
+      .toValidNel(ParseFailure("Invalid Email", value.value))
+  }
+  object EmailQueryParam extends QueryParamDecoderMatcher[Email]("email")(emailQueryParamDecoder)
 
 }

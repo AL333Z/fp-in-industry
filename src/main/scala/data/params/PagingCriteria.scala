@@ -7,7 +7,7 @@ import org.http4s.QueryParamDecoder
 
 case class PagingCriteria(pageNo: PageNo, pageSize: PageSize)
 
-object PagingCriteriaQueryParam {
+object PagingCritQueryParam {
 
   def unapply(params: Map[String, collection.Seq[String]]): Option[PagingCriteria] = {
     val pageNoOpt   = PageNoQueryParam.unapply(params)

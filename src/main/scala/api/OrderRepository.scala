@@ -1,6 +1,6 @@
 package api
 
-import cats.effect.{ ConcurrentEffect, IO }
+import cats.effect.IO
 import cats.implicits._
 import data.Order
 import data.params._
@@ -15,7 +15,7 @@ trait OrderRepository {
 
 object OrderRepository {
 
-  def from(collection: Collection)(implicit ce: ConcurrentEffect[IO]): OrderRepository =
+  def fromCollection(collection: Collection): OrderRepository =
     new OrderRepository {
 
       def findBy(

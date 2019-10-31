@@ -7,9 +7,9 @@ object OrderHistoryApp extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      mongoConfig <- Mongo.Config.load
+      config <- Mongo.Config.load
       _ <- OrderHistory
-            .from(mongoConfig)
+            .fromConfig(config)
             .use(_.serve)
     } yield ExitCode.Success
 }

@@ -34,7 +34,7 @@ class OrderHistoryRoutesTest extends FunSuite {
       override def findBy(company: Company, orderNo: OrderNo): IO[Option[Order]] = ???
     }
 
-    val sut = OrderHistoryRoutes.from(repo)
+    val sut = OrderHistoryRoutes.fromRepo(repo)
 
     val response: IO[Response[IO]] = sut.orNotFound.run(
       Request(method = Method.GET, uri = uri"/XXX/orders?email=test@test.com")

@@ -20,12 +20,12 @@ class OrderHistory private (routes: HttpRoutes[IO])(implicit ce: ContextShift[IO
 
 object OrderHistory {
 
-  def from(mongoConfig: Mongo.Config)(implicit ce: ContextShift[IO], ti: Timer[IO]): Resource[IO, OrderHistory] =
+  def fromConfig(mongoConfig: Mongo.Config)(implicit ce: ContextShift[IO], ti: Timer[IO]): Resource[IO, OrderHistory] =
     Mongo
       .collectionFrom(mongoConfig)
       .map { collection =>
-        val orderRepo    = OrderRepository.from(collection)
-        val orderService = OrderHistoryRoutes.from(orderRepo)
+        val orderRepo    = OrderRepository.fromCollection(collection)
+        val orderService = OrderHistoryRoutes.fromRepo(orderRepo)
         new OrderHistory(orderService)
       }
 }
