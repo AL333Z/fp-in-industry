@@ -1049,11 +1049,21 @@ All done!
 ---
 
 # Things I'm not telling you
+## Typeclasses
+
+---
+
+# Things I'm not telling you
+## Higher Kinded Types
+
+---
+
+# Things I'm not telling you
 ## Implicits dependencies
 
 - `fs2`, `fs2-rabbit` and `http4s` are polymorphic in the effect type `F[_]`
 - I only showed you its usage with `IO`..
-- I you actually look at the code in the repo, you'll see something like:
+- If you actually look at the code in the repo, you'll see something like:
 
 ```scala
 object OrderHistory {
@@ -1065,24 +1075,37 @@ object OrderHistory {
 ```
 ---
 
-# Things I'm not telling you
-## Implicits dependencies
-
-- using polymorphic libraries is cool
-- but you'll need to understand how polymorphism is achieved
-
-In Scala this actually mean.. **implicits**
+## Appendix: What does it mean polymorphic in the effect type `F[_]`?
+- let's suppose you want to provide a library which does some kind of IO operation (e.g. interacting with a DB)
+- and there exist multiple effect libraries in the ecosystem (e.g. cats-effect `IO`, monix `Task`, zio `ZIO`, etc..)
+- cats-effect provides a set of typeclasses which let us build IO libraries/applications without committing to a specific IO implementation!
 
 ---
 
 # Things I'm not telling you
-## Typeclasses
-
----
-
-# Things I'm not telling you
-## Higher Kinded Types
+## Testing
+###### Nobody really needs mockito.
 
 ---
 
 # Conclusions
+
+- 2 production-ready components in ~ 600 LOC
+- only 3 main datatypes: `IO`, `Resource`, `Stream`
+- no variables, no mutable state
+- no fancy nested abstractions
+- no unneeded polymorphism (e.g. tagless final)
+- I could have written almost the same code in Kotlin, Swift or.. Haskell!
+
+---
+
+# Thanks
+
+---
+
+# References
+
+https://typelevel.org/cats-effect/
+https://fs2.io/
+https://http4s.org/
+https://fs2-rabbit.profunktor.dev/
