@@ -1,4 +1,16 @@
-<!-- $theme: default -->
+# (Im)pratical Functional Programming
+## How to deliver business value through Functional Programming tecquines and abstractions
+
+---
+
+# Who am I
+
+## @al333z
+### Software Engineer
+### Runner
+###### Into FP since 2013
+
+---
 
 # Why this talk?
 
@@ -25,10 +37,10 @@ Why not.
 
 - The learning curve may be steep, depending on 
   - previous experiences
-  - willingness to experience a mental shift
+  - willingness to experience a _mental shift_
 - May not appear familiar at first, you just need to stick to it for a while
 - *Inertia*
-- I don't know.. are you willing to help me with point? :)
+- I don't know..
 
 ---
 # Agenda
@@ -42,10 +54,10 @@ Why not.
 
 ![](arch.png)
 
-Let's assume we are provided with domain events from an Order Managment System (e.g. OrderCreated), via a RabbitMQ broker. 
+Let's assume we are provided with domain events from an Order Managment Platform (e.g. OrderCreated), via a RabbitMQ broker. 
 In this session we'll build:
-- a component which is projecting a read model, in a MongoDB collection
-- a simple HTTP service, querying the collection to implement an Order History Service
+- a component which is projecting a model, in a MongoDB collection
+- a simple HTTP service, querying the collection to implement an order history service
 
 ---
 # Disclaimer
@@ -1093,7 +1105,7 @@ object OrderHistory {
 - 2 production-ready components in ~ 600 LOC
 - only 3 main datatypes: `IO`, `Resource`, `Stream`
 - no variables, no mutable state
-- no fancy nested abstractions
+- no fancy abstractions
 - no unneeded polymorphism (e.g. tagless final)
 - I could have written almost the same code in Kotlin, Swift or.. Haskell!
 
