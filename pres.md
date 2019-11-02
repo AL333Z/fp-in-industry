@@ -10,7 +10,7 @@ header-strong: #C44D58
 
 ## (Im)pratical Functional Programming
 
-#### _How to deliver business value through Functional Programming techniques and abstractions_
+#### _Adopting Functional Programming techniques and abstractions in industry_
 
 ---
 
@@ -898,17 +898,19 @@ object OrderRepository {
 ### Implementation
 
 ```scala
-new OrderRepository {
- def findBy(email: Email, company: Company): IO[List[Order]] = 
-   collection
-    .find(
-      Document(
-        "email"   -> email.value,
-        "company" -> company.value
-      )
-    )
-    .compile.toList // Stream[IO, Document] -> IO[List[Document]]
-    .flatMap(_.traverse(doc => IO.fromTry(Order.fromBson(doc)))) // IO[List[Document]] -> IO[List[Order]]
+def fromCollection(collection: Collection): OrderRepository = 
+  new OrderRepository {
+    def findBy(email: Email, company: Company): IO[List[Order]] = 
+      collection
+       .find(
+         Document(
+           "email"   -> email.value,
+           "company" -> company.value
+         )
+       )
+       .compile.toList // Stream[IO, Document] -> IO[List[Document]]
+       .flatMap(_.traverse(doc => IO.fromTry(Order.fromBson(doc)))) // IO[List[Document]] -> IO[List[Order]]
+  }
 }
 ```
 ---
@@ -947,6 +949,8 @@ Not reinventing the wheel, just using `http4s` lib
 
 ## Matching to value types
 
+`GET /:company/orders?email={email}`
+
 ```scala
 case class Company(value: String)
 
@@ -957,7 +961,11 @@ Match on path variables and query parameters, avoiding primitive types (`String`
 
 ---
 
-# Matching on path variables
+[.code-highlight: all]
+[.code-highlight: 2]
+[.code-highlight: all]
+
+# Matching on _path variables_
 
 Using _extractor objects_
 
@@ -970,7 +978,13 @@ object CompanyVar {
       None
 }
 ```
-Enabling pattern matching toward value types
+
+---
+
+# Matching on _path variables_
+
+Enabling __pattern matching__ toward value types
+
 ```scala
  def sample(s: String) = s match {
    case CompanyVar(x) => println("matched Company: " + x)
@@ -983,7 +997,7 @@ Enabling pattern matching toward value types
 
 ---
 
-# Matching on path variables
+# Matching on _path variables_
 
 ```scala
 object CompanyVar {
@@ -1002,44 +1016,42 @@ object CompanyVar {
 
 # Matching on query params
 
-A more powerful extractors, which is also performing validations
+Also performing validations...
 
 ```scala
 object Email {
- // incomplete/wrong..
- private def validate(x: String): Option[String] =
-   """(\w+)@([\w\.]+)""".r.findFirstIn(x)
+ // incomplete..
+ private def validate(x: String): Option[String] = """(\w+)@([\w\.]+)""".r.findFirstIn(x)
    
  val decoder: QueryParamDecoder[Email] = value =>
    validate(value.value)
    .map(Email(_))
    .toValidNel(ParseFailure("Invalid Email", value.value) 
 
- object EmailQueryParam 
-   extends QueryParamDecoderMatcher[Email]("email")(decoder)
+ object EmailQueryParam extends QueryParamDecoderMatcher[Email]("email")(decoder)
 }
 ```
 
-- A bit tricky at first, but really powefull
-- Returns a `BadRequest` in case the validation fails
+- A bit tricky at first, but really poweful
+- Returns a `BadRequest` in case the _validation fails_
 
 ---
 
 # 3.1 Define routes
 
-`HttpRoutes` are constructed by **pattern matching** the request, combining object extractors!
+- `HttpRoutes` are constructed by **pattern matching** the request
+- combining _path variables_ and _query param_ extractors!
 
 ```scala
 HttpRoutes.of[IO] {
- case GET -> Root / CompanyVar(company) / "orders"
-       :? EmailQueryParam(email) => ???
- case GET -> Root / "other" => ???
+ case GET -> Root / CompanyVar(company) / "orders" :? EmailQueryParam(email) => ???
+ case GET -> Root / "other"                                                  => ???
 }
 ```
 
 - will match `/ACME/orders?email=asd@sdf.com`
 - will return 400 on `/ACME/orders?email=notanemail`
-- will return 404 on `/other`
+- will return 404 on `/foo`
 
 ---
 
@@ -1057,10 +1069,17 @@ The api application should:
 
 # http4s routes - explained
 
-- `HttpRoutes[IO]` is an alias for `Kleisli[OptionT[IO, ?], Request, Response]`
-- which can be rewritten (more or less..) to `Request => IO[Option[Response]]`
-- the `orNotFound` extension method will handle the case whether the request won't match any route, returning a `404`
-- our routes are now `Request => IO[Response]`
+`HttpRoutes[IO]` is an alias for 
+`Kleisli[OptionT[IO, ?], Request, Response]`
+ 
+Which can be rewritten (more or less..) to 
+`Request => IO[Option[Response]]`
+
+The `orNotFound` extension method will handle the case whether the request won't match any route, returning a `404`
+
+Our routes are now `Request => IO[Response]`
+
+[.footer: NB: not 100% accurate, but close enough]
 
 ---
 
@@ -1071,8 +1090,7 @@ object OrderHistoryRoutes {
   def fromRepo(
    orderRepository: OrderRepository): HttpRoutes[IO] = 
      HttpRoutes.of[IO] {
-      case GET -> Root / CompanyVar(company) / "orders"
-            :? EmailQueryParam(email) =>
+      case GET -> Root / CompanyVar(company) / "orders" :? EmailQueryParam(email) =>
               orderRepository
                 .findBy(email, company)
                 .flatMap(res => Ok(res.asJson))
@@ -1080,9 +1098,9 @@ object OrderHistoryRoutes {
 } 
 ```
 
-- smart constructor, building routes
-- matching/validating requests, handling errors with `4XX`
-- returning `200` for the happy path
+- smart constructor, _building routes_
+- _matching/validating requests_, _handling errors_ with `4XX`
+- _returning_ `200` for the happy path
 
 ---
 
@@ -1130,13 +1148,17 @@ object OrderHistoryApp extends IOApp {
   def run(args: List[String]): IO[ExitCode] =
     for {
       mongoConfig <- Mongo.Config.load
+
       _ <- OrderHistory
             .fromConfig(mongoConfig)
             .use(_.serve)
+
     } yield ExitCode.Success
 }
 ```
-All done!
+---
+
+# All done!
 
 ---
 
@@ -1145,19 +1167,23 @@ All done!
 ---
 
 # Things I'm not telling you
-## Typeclasses
+## _Typeclasses_
 
 ---
 
 # Things I'm not telling you
-## Higher Kinded Types
+## _Higher Kinded Types_
 
 ---
 
-# Things I'm not telling you
-## Implicits dependencies
+[.code-highlight: all]
+[.code-highlight: 4]
+[.code-highlight: all]
 
-- `fs2`, `fs2-rabbit` and `http4s` are polymorphic in the effect type `F[_]`
+# Things I'm not telling you
+## _Implicits dependencies_
+
+- `fs2`, `fs2-rabbit` and `http4s` are _polymorphic_ in the effect type `F[_]`
 - I only showed you its usage with `IO`..
 - If you actually look at the code in the repo, you'll see something like:
 
@@ -1172,26 +1198,26 @@ object OrderHistory {
 ---
 
 ## Appendix: What does it mean polymorphic in the effect type `F[_]`?
-- let's suppose you want to provide a library which does some kind of IO operation (e.g. interacting with a DB)
-- and there exist multiple effect libraries in the ecosystem (e.g. cats-effect `IO`, monix `Task`, zio `ZIO`, etc..)
-- cats-effect provides a set of typeclasses which let us build IO libraries/applications without committing to a specific IO implementation!
+- let's suppose you want to provide a _library_ which does some kind of IO operation (e.g. interacting with a DB)
+- and there exist _multiple effect libraries_ in the ecosystem (e.g. cats-effect `IO`, monix `Task`, zio `ZIO`, etc..)
+- cats-effect provides __a set of typeclasses__ which let us build IO libraries/applications __without committing to a specific IO implementation__!
 
 ---
 
 # Things I'm not telling you
 ## Testing
-###### Nobody really needs mockito.
+###### _Nobody really needs mockito_
 
 ---
 
 # Conclusions
 
-- 2 production-ready components in ~ 600 LOC
-- only 3 main datatypes: `IO`, `Resource`, `Stream`
-- no variables, no mutable state
+- 2 production-ready components in under 600 LOC
+- only _3 main datatypes_: `IO`, `Resource`, `Stream`
+- no _variables_, no _mutable state_
 - no fancy abstractions
 - no unneeded polymorphism (e.g. tagless final)
-- I could have written almost the same code in Kotlin, Swift or.. Haskell!
+- __I could have written almost the same code in Kotlin, Swift or.. Haskell!__
 
 ---
 
@@ -1201,6 +1227,7 @@ object OrderHistory {
 
 # References
 
+https://github.com/AL333Z/fp-in-industry
 https://typelevel.org/cats-effect/
 https://fs2.io/
 https://http4s.org/
