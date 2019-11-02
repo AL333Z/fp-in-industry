@@ -1,23 +1,34 @@
+autoscale: true
+header: #FF6B6B
+footer-style: #C44D58
+text: #4ECDC4
+text-emphasis: #FFFFFF
+text-strong: #C7F464
+header-emphasis: #C44D58
+header-strong: #C44D58
+
 
 ## (Im)pratical Functional Programming
 
-#### How to deliver business value through Functional Programming techniques and abstractions
+#### _How to deliver business value through Functional Programming techniques and abstractions_
 
 ---
 
 # Who am I
 
-## @al333z
+## _@al333z_
 ### Software Engineer
 ### Runner
-###### Into FP since 2013
+###### Into FP since 2014
+
+![right fill](pic.jpg)
 
 ---
 
 # Why this talk?
 
-#### How many times have you heard:
-- FP is **_too hard_**
+### _How many times have you heard:_
+- FP is _too hard_
 - FP is _not pragmatic_
 - FP is not suited __to deliver value to the business__
 
@@ -32,19 +43,17 @@ Why not.
 # Why Functional Programming?
 
 - Built on __solid foundations__, but there's no need to be a mathematician to be a functional programmer!
-- Offers **_abstractions and tecniques_** to solve concrete problems
-- Improves code reuse, through **composition**
+- Offers __abstractions and tecniques__ to solve concrete problems
+- Improves code reuse, through __composition__
 - Let us build programs which are **_simpler to reason about_**
 
 ---
-[.autoscale: true]
-# Why Programmers are scared by Functional Programming?
 
-- The learning curve may be steep, depending on 
-  - previous experiences
-  - willingness to experience a _mental shift_
-- May not appear familiar at first, you just need to stick to it for a while
-- *Inertia*
+# Why Developers are scared by Functional Programming?
+
+- the *learning curve* may be steep 
+- willingness to experience a _mental shift_
+- may not appear _familiar_ at first
 - I just don't know..
 
 ---
@@ -57,18 +66,18 @@ Why not.
 
 ---
 
-# Sample Architecture: Order History Service
+# Sample Architecture: _Order History Service_
 
-![Inline](arch.png)
+![Inline, 70%](arch-white.png)
 
 - Let's assume we are provided with domain events from an Order Managment Platform (e.g. OrderCreated), via a RabbitMQ broker
 - We need to build an Order History Service
 
 ---
 
-# Order History Service: components
+# Order History Service: _components_
 
-![Inline](arch.png)
+![Inline, 70%](arch-white.png)
 
 - a component which projects a model, in a MongoDB collection
 - a simple HTTP service, which queries the collection returning orders
@@ -77,32 +86,29 @@ Why not.
 
 # Disclaimer
 
-Our focus here is **NOT** on the System Architecture
+Our focus here is **_NOT_** on the System Architecture
 
-We'll just put our attention on **implementing architecture components** using Pure Functional Programming, in Scala
-
----
-
-# Why Scala
+We'll just put our attention on _implementing architecture components_ using Pure Functional Programming, in Scala
 
 ---
 
 # Why Scala
 
-## I know Scala
-
 ---
-
-[.autoscale: true]
 
 # Why Scala
 
-- first-class support for many language features needed to implement functional abstractions
-  - immutable data types, ADTs
-  - higher-kinded types + implicits -> typeclasses
-  - DSL-friendly
-  - discourage runtime checks (reflections, etc..)
-- mature ecosystem of FP libs (cats, cats-effects, fs2, circe, http4s, etc..)
+## _I know Scala_
+
+---
+
+# Why Scala
+
+- immutability, _ADTs_
+- higher-kinded types + implicits -> *typeclasses*
+- DSL-friendly
+- discourages runtime checks (reflections, etc..)
+- __mature ecosystem__ of FP libs (cats, cats-effects, fs2, circe, http4s, etc..)
 
 ---
 # Let's start
@@ -110,10 +116,10 @@ We'll just put our attention on **implementing architecture components** using P
 
 # Building a projector
 
-![inline](projector.png)
+![Inline, 80%](projector-white.png)
 
-- **Consume** a *stream of events* from a RabbitMQ queue
-- **Persist** a model to a MongoDB collection
+- __Consume__ a stream of events from a RabbitMQ queue
+- __Persist__ a model to a MongoDB collection
 
 ---
 
@@ -128,7 +134,7 @@ We'll just put our attention on **implementing architecture components** using P
 
 ---
 
-# Can FP help us with I/O operations?
+# Can FP help us with **I/O** operations?
 
 ---
 
@@ -139,7 +145,11 @@ A data type for **encoding side effects** as pure values, capable of expressing 
 - can end in *either success or failure* (short-circuiting in case of failure)
 - may support *cancellation*
  
-A value of type `IO[A]` is a computation which, when evaluated, can perform effects before returning a value of type A. 
+---
+
+# Introducing IO
+
+A value of type `IO[A]` is a computation that, when evaluated, can perform __effects__ before returning a value of type `A`. 
 
 ---
 
@@ -147,7 +157,7 @@ A value of type `IO[A]` is a computation which, when evaluated, can perform effe
 
 - are *pure* and *immutable*
 - represents just a description of a *side effectful computation*
-- are **not evaluated** until the *"end of the world"*
+- are not evaluated (_suspended_) until the **end of the world**
 
 ---
 
@@ -187,9 +197,13 @@ val program: IO[Unit] =
 ```
 ---
 
-# A first pratical sample
+# Putting things in practice!
 
 ---
+
+[.code-highlight: all]
+[.code-highlight: 7,13]
+[.code-highlight: all]
 
 # 1. Read a bunch of configs from the env
 
@@ -212,7 +226,7 @@ object Mongo {
 ```
 ---
 
-# Suspending effects
+# Composing effects
 
 ```scala
 val ioOps = 
@@ -232,6 +246,10 @@ Who's gonna **_run_** the suspended computation then?
 
 ---
 
+[.code-highlight: all]
+[.code-highlight: 2]
+[.code-highlight: all]
+
 # *End of the world*
 
 `IOApp` is a safe application type that describes a main which executes an `IO`, as the single _entry point_ to a **pure** program.
@@ -246,9 +264,7 @@ object OrderHistoryProjectorApp extends IOApp {
     } yield ExitCode.Success
 }
 ```
-___
-
-`IOApp` provides an **_interpreter_** which will evaluate the `IO` value returned by the `run` method, dealing with all the dirty details of the JVM runtime, so _*you don't have to*_!
+^ `IOApp` provides an **_interpreter_** which will evaluate the `IO` value returned by the `run` method, dealing with all the dirty details of the JVM runtime, so _*you don't have to*_!
 
 ---
 
@@ -275,10 +291,9 @@ Using `fs2-rabbit` lib which:
 ## Open a connection
 
 ```scala 
-val client = Fs2Rabbit[IO](config)
-// Fs2Rabbit[IO]
-val channel = client.createConnectionChannel
-//  Resource[IO, AMQPChannel]
+val client: Fs2Rabbit[IO] = Fs2Rabbit[IO](config)
+
+val channel: Resource[IO, AMQPChannel] = client.createConnectionChannel
 ```
 
 ### What's a `Resource`?
@@ -288,6 +303,12 @@ val channel = client.createConnectionChannel
 # Introducing Resource
 
 #### Effectfully allocates and releases a resource
+
+---
+
+# Extremely helpfull to write code that:
+- doesn't leak
+- handles properly terminal signals
 
 ---
 
@@ -311,12 +332,6 @@ object Resource {
 
 ---
 
-# Extremely helpfull to write code that:
-- doesn't leak
-- handles properly terminal signals
-
----
-
 # Introducing Resource - simplified
 
 - Sticking to `IO`...
@@ -324,6 +339,9 @@ object Resource {
 ```scala
 class Resource[A] {
   def use[B](f: A => IO[B]): IO[B]
+
+  def map[B](f: A => B): Resource[IO, B]
+  def flatMap[B](f: A => Resource[IO, B]): Resource[IO, B]
   ...
 }
 
@@ -355,17 +373,17 @@ def mkResource(s: String): Resource[IO, String] = {
 # Using a Resource
 
 ```scala
-val r = for {
+val r: Resource[IO, (String, String)] = 
+for {
   outer <- mkResource("outer")
   inner <- mkResource("inner")
 } yield (outer, inner)
-// Resource[IO, (String, String)]
 
-r.use { case (a, b) => IO(println(s"Using $a and $b")) }
-// IO[Unit]
+r.use { case (a, b) => IO(println(s"Using $a and $b")) } // IO[Unit]
 ```
 
 ```
+Output:
 Acquiring outer
 Acquiring inner
 Using outer and inner
@@ -382,6 +400,13 @@ Releasing outer
 - You can _lift_ any `IO[A]` into a `Resource[IO, A]` with a no-op release via `Resource.liftF`
 
 ---
+
+[.code-highlight: all]
+[.code-highlight: 7]
+[.code-highlight: 8]
+[.code-highlight: 9-14]
+[.code-highlight: 16]
+[.code-highlight: all]
 
 # 2.1. Interact with a RabbitMQ broker
 
@@ -431,20 +456,21 @@ type Consumer =
 
 # Introducing Stream
 
-A stream _producing output_ of type `O` and which may _evaluate `F` effects_.
+- Describes a *sequence* of effectful computation
+- **_Pull-based_**,  a consumer pulls its values by repeatedly performing one pull step at a time
+- **Simplify the way we write concurrent streaming consumers**
 
-```scala
-class Stream[F[_], +O]{
-  def evalMap[O2](f: O => F[O2]): Stream[F, O2]
-}
-```
 ---
 
 # Introducing Stream
 
-- Describes a *sequence* of effectful computation
-- **_Pull-based_**,  a consumer pulls its values by repeatedly performing one pull step at a time
-- **Simplify the way we write concurrent streaming consumers**
+A stream _producing output_ of type `O` and which may _evaluate `F` effects_.
+
+```scala
+class Stream[F[_], O]{
+  def evalMap[O2](f: O => F[O2]): Stream[F, O2]
+}
+```
 
 ---
 
@@ -453,7 +479,7 @@ class Stream[F[_], +O]{
 A stream _producing output_ of type `O` and which may _evaluate `IO` effects_.
 
 ```scala
-class Stream[+O]{
+class Stream[O]{
   def evalMap[O2](f: O => IO[O2]): Stream[IO, O2]
 }
 ```
@@ -466,25 +492,27 @@ class Stream[+O]{
 
 ---
 
+[.code-highlight: all]
+[.code-highlight: 3,12]
+[.code-highlight: 4-11]
+[.code-highlight: all]
+
 # Consuming a Stream
 
 ```scala 
 class OrderHistoryProjector(consumer: Consumer, acker: Acker, logger: Logger) {
- val project: IO[Unit] =
-  (for {
-    _ <- consumer.evalMap { envelope =>
-     for {
-       _ <- envelope.payload match {
-          case Success(event) =>
-            logger.info("Received: " + event) *>
-              acker(AckResult.Ack(envelope.deliveryTag))
-          case Failure(e) =>
-            logger.error(e)("Error while decoding") *>
-              acker(AckResult.NAck(envelope.deliveryTag))
-       }
-     } yield ()
-   }
-  } yield ()).compile.drain
+  val project: IO[Unit] =
+    consumer.evalMap { envelope =>
+      envelope.payload match {
+        case Success(event) =>
+          logger.info("Received: " + envelope) *>
+            acker(AckResult.Ack(envelope.deliveryTag))
+        case Failure(e) =>
+          logger.error(e)("Error while decoding") *>
+            acker(AckResult.NAck(envelope.deliveryTag))
+      }
+    }
+     .compile.drain
 }
 ```
 
@@ -506,11 +534,11 @@ Using the official `mongo-scala-driver`, which is *not* exposing purely function
 
 ---
 
-# How to turn an API to be _functional_?
+# How to turn an API to be _functional<sup>TM</sup>_?
 
 ---
 
-# How to turn an API to be _functional_?
+# How to turn an API to be _functional<sup>TM</sup>_?
 
 In this case:
 - **_wrap_** the impure type
@@ -565,6 +593,10 @@ object Mongo {
 
 ---
 
+[.code-highlight: all]
+[.code-highlight: 8,15]
+[.code-highlight: all]
+
 # 3.2 Store the model to the given collection
 
 ```scala 
@@ -589,26 +621,28 @@ object EventRepository {
 
 ---
 
+[.code-highlight: all]
+[.code-highlight: 1]
+[.code-highlight: 7]
+[.code-highlight: all]
+
 # 3.2 Store the model to the given collection
 
 ```scala
 class OrderHistoryProjector(eventRepo: EventRepository,  consumer: Consumer,  acker: Acker,  logger: Logger) {
- val project: IO[Unit] =
-  (for {
-   _ <- consumer.evalMap { envelope =>
-         for {
-          _ <- envelope.payload match {
-               case Success(event) =>
-                 logger.info("Received: " + envelope) *> 
-                  eventRepo.store(event) *>
-                   acker(AckResult.Ack(envelope.deliveryTag))
-               case Failure(e) =>
-                 logger.error(e)("Error while decoding") *>
-                   acker(AckResult.NAck(envelope.deliveryTag))
-               }
-         } yield ()
-       }
-  } yield ()).compile.drain
+  val project: IO[Unit] =
+    consumer.evalMap { envelope =>
+      envelope.payload match {
+        case Success(event) =>
+          logger.info("Received: " + envelope) *>
+            eventRepo.store(event) *>
+              acker(AckResult.Ack(envelope.deliveryTag))
+        case Failure(e) =>
+          logger.error(e)("Error while decoding") *>
+            acker(AckResult.NAck(envelope.deliveryTag))
+      }
+    }
+     .compile.drain 
 }
 ```
 
@@ -634,9 +668,9 @@ How to achieve _dependency inversion_?
 # Wiring
 
 - *`Reader`*/*`Kleisli`*?
-- **Cake pattern*?
+- *Cake pattern*?
 - *Dagger* et similia?
-- Your favourite _DI framework_ with xmls and reflection?
+- Your favourite *DI framework* with xmls and reflection?
 
 ---
 
@@ -669,6 +703,11 @@ How to achieve _dependency inversion_?
 
 ---
 
+[.code-highlight: all]
+[.code-highlight: 1]
+[.code-highlight: 10-12]
+[.code-highlight: all]
+
 # Wiring - Constructor Injection
 
 ```scala
@@ -698,14 +737,13 @@ object OrderHistoryProjector {
     rabbitConfig: Fs2RabbitConfig
   ): Resource[IO, OrderHistoryProjector] =
     for {
-      collection <- Mongo.collectionFrom(mongoConfig)
-      logger     <- Resource.liftF(Slf4jLogger.create[IO])
+      collection        <- Mongo.collectionFrom(mongoConfig)
+      logger            <- Resource.liftF(Slf4jLogger.create[IO])
       (acker, consumer) <- Rabbit.consumerFrom(
                             rabbitConfig,
                             eventDecoder)
       repo = EventRepository.fromCollection(collection)
-    } yield 
-       new OrderHistoryProjector(repo, consumer, acker, logger)
+    } yield new OrderHistoryProjector(repo, consumer, acker, logger)
 }
 ```
 
@@ -715,8 +753,13 @@ object OrderHistoryProjector {
 
 - **No magic at all**, each dependency is explicitely passed in the *smart constructor* of each component
 - Acquiring/releasing resources is handled as an *effect*
+- Cancellation events trigger resources to be released
 
 ---
+
+[.code-highlight: all]
+[.code-highlight: 9-11]
+[.code-highlight: all]
 
 # Projector Application: Main
 
@@ -738,9 +781,15 @@ object OrderHistoryProjectorApp extends IOApp {
 ```
 
 ---
+
+# End of part 1
+
+![inline](meme1.jpg)
+
+---
 # Sample Architecture: Order History Service
 
-![inline](arch.png)
+![Inline, 80%](arch-white.png)
 
 ---
 
@@ -750,7 +799,7 @@ object OrderHistoryProjectorApp extends IOApp {
 
 # Building an HTTP api
 
-![inline](api.png)
+![Inline, 80%](api-white.png)
 
 ---
 
@@ -850,21 +899,16 @@ object OrderRepository {
 
 ```scala
 new OrderRepository {
- def findBy(
-   email: Email,
-   company: Company
- ): IO[List[Order]] = 
+ def findBy(email: Email, company: Company): IO[List[Order]] = 
    collection
     .find(
-      document = Document(
+      Document(
         "email"   -> email.value,
         "company" -> company.value
       )
     )
     .compile.toList // Stream[IO, Document] -> IO[List[Document]]
-    .flatMap( // IO[List[Document]] -> IO[List[Order]]
-      _.traverse(doc => IO.fromTry(Order.fromBson(doc)))
-    )
+    .flatMap(_.traverse(doc => IO.fromTry(Order.fromBson(doc)))) // IO[List[Document]] -> IO[List[Order]]
 }
 ```
 ---

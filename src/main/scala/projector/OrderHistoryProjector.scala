@@ -22,21 +22,17 @@ class OrderHistoryProjector private[projector] (
 ) {
 
   val project: IO[Unit] =
-    (for {
-      _ <- consumer.evalMap { envelope =>
-            for {
-              _ <- logger.info("Received: " + envelope)
-              _ <- envelope.payload match {
-                    case Success(event) =>
-                      eventRepo.store(event) *>
-                        acker(AckResult.Ack(envelope.deliveryTag))
-                    case Failure(e) =>
-                      logger.error(e)("Error while decoding") *>
-                        acker(AckResult.NAck(envelope.deliveryTag))
-                  }
-            } yield ()
-          }
-    } yield ()).compile.drain
+    consumer.evalMap { envelope =>
+      envelope.payload match {
+        case Success(event) =>
+          logger.info("Received: " + envelope) *>
+            eventRepo.store(event) *>
+            acker(AckResult.Ack(envelope.deliveryTag))
+        case Failure(e) =>
+          logger.error(e)("Error while decoding") *>
+            acker(AckResult.NAck(envelope.deliveryTag))
+      }
+    }.compile.drain
 }
 
 object OrderHistoryProjector {
