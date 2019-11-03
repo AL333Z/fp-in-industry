@@ -7,10 +7,10 @@ text-strong: #C7F464
 header-emphasis: #C44D58
 header-strong: #C44D58
 
-
 ## (Im)pratical Functional Programming
 
-#### _Adopting Functional Programming techniques and abstractions in industry_
+### _Adopting Functional Programming_
+### _In industry_
 
 ---
 
@@ -18,10 +18,10 @@ header-strong: #C44D58
 
 ## _@al333z_
 ### Software Engineer
+### Member of FP in Bologna ![inline 10%](pics/fpinbo.jpg)
 ### Runner
-###### Into FP since 2014
 
-![right fill](pic.jpg)
+![right](pics/pic.jpg)
 
 ---
 
@@ -68,19 +68,23 @@ Why not.
 
 # Sample Architecture: _Order History Service_
 
-![Inline, 70%](arch-white.png)
+![Inline, 70%](pics/arch-white.png)
 
 - Let's assume we are provided with domain events from an Order Managment Platform (e.g. OrderCreated), via a RabbitMQ broker
 - We need to build an Order History Service
+
+^ Talk ONLY about REQUIREMENTS!
 
 ---
 
 # Order History Service: _components_
 
-![Inline, 70%](arch-white.png)
+![Inline, 70%](pics/arch-white.png)
 
 - a component which projects a model, in a MongoDB collection
 - a simple HTTP service, which queries the collection returning orders
+
+^ Talk ONLY about COMPONENTS!
 
 ---
 
@@ -116,7 +120,7 @@ We'll just put our attention on _implementing architecture components_ using Pur
 
 # Building a projector
 
-![Inline, 80%](projector-white.png)
+![Inline, 80%](pics/projector-white.png)
 
 - __Consume__ a stream of events from a RabbitMQ queue
 - __Persist__ a model to a MongoDB collection
@@ -140,9 +144,9 @@ We'll just put our attention on _implementing architecture components_ using Pur
 
 # Introducing IO
 
-A data type for **encoding side effects** as pure values, capable of expressing both computations such that:
+A data type for **encoding effects** as pure values, capable of expressing both computations such that:
+- can end in *either success or failure*
 - on evaluation *yield exactly one result*
-- can end in *either success or failure* (short-circuiting in case of failure)
 - may support *cancellation*
  
 ---
@@ -173,27 +177,40 @@ object IO {
   ...
 }
 
-class IO[+A] {
+class IO[A] {
   def map[B](f: A => B): IO[B]
   def flatMap[B](f: A => IO[B]): IO[B]
   def *>[B](fb: IO[B]): IO[B]
   ...
 }
 ```
+
 ---
+
+[.code-highlight: none]
+[.code-highlight: 1]
+[.code-highlight: all]
 
 # Composing sequential effects
 
 ```scala
-val ioa = IO.delay{ println("hey!") }
+val ioInt: IO[Int] = IO.delay{ println("hey!"); 1 }
 
 val program: IO[Unit] =
  for {
-    _ <- ioa
-    _ <- IO.sleep(1.second)
-    _ <- IO.raiseError(new RuntimeException("boom"))
-    _ <- ioa // not executed, comps is short-circuted
+    i1 <- ioInt
+    _  <- IO.sleep(i.second)
+    _  <- IO.raiseError(new RuntimeException("boom!"))
+    i2 <- ioInt // not executed, comps is short-circuted
  } yield ()
+```
+
+[.code-highlight: none]
+[.code-highlight: all]
+```
+Output:
+hey
+RuntimeException: boom!
 ```
 ---
 
@@ -201,7 +218,7 @@ val program: IO[Unit] =
 
 ---
 
-[.code-highlight: all]
+[.code-highlight: 2-3]
 [.code-highlight: 7,13]
 [.code-highlight: all]
 
@@ -236,6 +253,8 @@ val ioOps =
     // TODO use configs to do something!
  } yield ()
 ```
+
+^ Let's take a detour to talk about how this composed computation gets executed..
 
 ---
 # How IO values are executed?
@@ -306,7 +325,7 @@ val channel: Resource[IO, AMQPChannel] = client.createConnectionChannel
 
 ---
 
-# Extremely helpfull to write code that:
+# Extremely helpful to write code that:
 - doesn't leak
 - handles properly terminal signals
 
@@ -315,6 +334,36 @@ val channel: Resource[IO, AMQPChannel] = client.createConnectionChannel
 # Introducing Resource
 
 ```scala
+object Resource {
+  def make[A](
+    acquire: IO[A])(
+    release: A => IO[Unit]): Resource[A]
+}
+
+class Resource[A] {
+  def use[B](f: A => IO[B]): IO[B]
+
+  def map[B](f: A => B): Resource[B]
+  def flatMap[B](f: A => Resource[B]): Resource[B]
+  ...
+}
+```
+
+[.footer: NB: not actual code, just a simplification sticking with IO type]
+^ A note on the simplification
+
+---
+<!--
+
+## Resource is polymorphic on its effect type
+
+```scala
+object Resource {
+  def make[F[_], A](
+    acquire: F[A])(
+    release: A => F[Unit]): Resource[F, A]
+}
+
 class Resource[F[_], A] {
   def use[B](f: A => F[B]): F[B]
 
@@ -322,48 +371,26 @@ class Resource[F[_], A] {
   def flatMap[B](f: A => Resource[F, B]): Resource[F, B]
   ...
 }
-
-object Resource {
-  def make[F[_], A](
-    acquire: F[A])(
-    release: A => F[Unit]): Resource[F, A]
-}
 ```
-
 ---
+-->
 
-# Introducing Resource - simplified
+[.code-highlight: 1]
+[.code-highlight: 2-3]
+[.code-highlight: 5-6]
+[.code-highlight: 8]
+[.code-highlight: all]
 
-- Sticking to `IO`...
-
-```scala
-class Resource[A] {
-  def use[B](f: A => IO[B]): IO[B]
-
-  def map[B](f: A => B): Resource[IO, B]
-  def flatMap[B](f: A => Resource[IO, B]): Resource[IO, B]
-  ...
-}
-
-object Resource {
-  def make[A](
-    acquire: IO[A])(
-    release: A => IO[Unit]): Resource[A]
-}
-```
-
-[.footer: NB: not actual code, just an artificial simplification]
----
 
 # Making a Resource
 
 ```scala
 def mkResource(s: String): Resource[IO, String] = {
   val acquire = 
-    IO(println(s"Acquiring $s")) *> IO.pure(s)
+    IO.delay(println(s"Acquiring $s")) *> IO.pure(s)
 
   def release(s: String) = 
-    IO(println(s"Releasing $s"))
+    IO.delay(println(s"Releasing $s"))
 
   Resource.make(acquire)(release)
 }
@@ -374,12 +401,12 @@ def mkResource(s: String): Resource[IO, String] = {
 
 ```scala
 val r: Resource[IO, (String, String)] = 
-for {
-  outer <- mkResource("outer")
-  inner <- mkResource("inner")
-} yield (outer, inner)
+  for {
+    outer <- mkResource("outer")
+    inner <- mkResource("inner")
+  } yield (outer, inner)
 
-r.use { case (a, b) => IO(println(s"Using $a and $b")) } // IO[Unit]
+r.use { case (a, b) => IO.delay(println(s"Using $a and $b")) } // IO[Unit]
 ```
 
 ```
@@ -428,16 +455,6 @@ val rabbitDeps: Resource[IO, (Acker, Consumer)] = for {
   )
 } yield (acker, consumer)
 ```
----
-
-# Projector application
-1. ~~read a bunch of configs from the env~~
-2. ~~interact with a RabbitMQ broker~~
-2.1 ~~open a connection~~
-2.2 receive a Stream of events from the given queue
-3. interact with a MongoDB cluster
-3.1 open a connection
-3.2 store the model to the given collection
 
 ---
 
@@ -464,27 +481,15 @@ type Consumer =
 
 # Introducing Stream
 
-A stream _producing output_ of type `O` and which may _evaluate `F` effects_.
-
-```scala
-class Stream[F[_], O]{
-  def evalMap[O2](f: O => F[O2]): Stream[F, O2]
-}
-```
-
----
-
-# Introducing Stream - simplified
-
 A stream _producing output_ of type `O` and which may _evaluate `IO` effects_.
 
 ```scala
 class Stream[O]{
-  def evalMap[O2](f: O => IO[O2]): Stream[IO, O2]
+  def evalMap[O2](f: O => IO[O2]): Stream[O2]
 }
 ```
 
-[.footer: NB: not actual code, just an artificial simplification]
+[.footer: NB: not actual code, just a simplification sticking with IO type]
 
 --- 
 
@@ -753,7 +758,6 @@ object OrderHistoryProjector {
 
 - **No magic at all**, each dependency is explicitely passed in the *smart constructor* of each component
 - Acquiring/releasing resources is handled as an *effect*
-- Cancellation events trigger resources to be released
 
 ---
 
@@ -784,12 +788,12 @@ object OrderHistoryProjectorApp extends IOApp {
 
 # End of part 1
 
-![inline](meme1.jpg)
+![inline](pics/meme1.jpg)
 
 ---
 # Sample Architecture: Order History Service
 
-![Inline, 80%](arch-white.png)
+![Inline, 80%](pics/arch-white.png)
 
 ---
 
@@ -799,7 +803,7 @@ object OrderHistoryProjectorApp extends IOApp {
 
 # Building an HTTP api
 
-![Inline, 80%](api-white.png)
+![Inline, 80%](pics/api-white.png)
 
 ---
 
@@ -1090,16 +1094,15 @@ object OrderHistoryRoutes {
   def fromRepo(
    orderRepository: OrderRepository): HttpRoutes[IO] = 
      HttpRoutes.of[IO] {
-      case GET -> Root / CompanyVar(company) / "orders" :? EmailQueryParam(email) =>
-              orderRepository
-                .findBy(email, company)
-                .flatMap(res => Ok(res.asJson))
+       case GET -> Root / CompanyVar(company) / "orders" :? EmailQueryParam(email) =>
+               orderRepository
+                 .findBy(email, company)
+                 .flatMap(res => Ok(res.asJson))
      }
 } 
 ```
 
 - smart constructor, _building routes_
-- _matching/validating requests_, _handling errors_ with `4XX`
 - _returning_ `200` for the happy path
 
 ---
