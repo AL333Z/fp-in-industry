@@ -18,7 +18,7 @@ header-strong: #C44D58
 
 ## _@al333z_
 ### Software Engineer
-### Member of FP in Bologna ![inline 10%](pics/fpinbo.jpg)
+### Member of _FP in Bologna_ ![inline 10%](pics/fpinbo.jpg)
 ### Runner
 
 ![right](pics/pic.jpg)
@@ -187,11 +187,11 @@ class IO[A] {
 
 ---
 
+# Composing sequential effects
+
 [.code-highlight: none]
 [.code-highlight: 1]
 [.code-highlight: all]
-
-# Composing sequential effects
 
 ```scala
 val ioInt: IO[Int] = IO.delay{ println("hey!"); 1 }
@@ -310,9 +310,9 @@ Using `fs2-rabbit` lib which:
 ## Open a connection
 
 ```scala 
-val client: Fs2Rabbit[IO] = Fs2Rabbit[IO](config)
+val client: Fs2Rabbit = Fs2Rabbit[IO](config)
 
-val channel: Resource[IO, AMQPChannel] = client.createConnectionChannel
+val channel: Resource[AMQPChannel] = client.createConnectionChannel
 ```
 
 ### What's a `Resource`?
@@ -385,7 +385,7 @@ class Resource[F[_], A] {
 # Making a Resource
 
 ```scala
-def mkResource(s: String): Resource[IO, String] = {
+def mkResource(s: String): Resource[String] = {
   val acquire = 
     IO.delay(println(s"Acquiring $s")) *> IO.pure(s)
 
@@ -400,7 +400,7 @@ def mkResource(s: String): Resource[IO, String] = {
 # Using a Resource
 
 ```scala
-val r: Resource[IO, (String, String)] = 
+val r: Resource[(String, String)] = 
   for {
     outer <- mkResource("outer")
     inner <- mkResource("inner")
@@ -424,7 +424,7 @@ Releasing outer
 - _Nested resources_ are released in *reverse order* of acquisition 
 - Outer resources are released even if an inner use or release fails
 - Easy to _lift_ an `AutoClosable` to `Resource`, via `Resource.fromAutoclosable`
-- You can _lift_ any `IO[A]` into a `Resource[IO, A]` with a no-op release via `Resource.liftF`
+- You can _lift_ any `IO[A]` into a `Resource[A]` with a no-op release via `Resource.liftF`
 
 ---
 
@@ -439,11 +439,11 @@ Releasing outer
 
 ```scala 
 type Acker = AckResult => IO[Unit] 
-type Consumer = Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]]
+type Consumer = Stream[AmqpEnvelope[Try[OrderCreatedEvent]]]
 
-val client: Fs2Rabbit[IO] = Fs2Rabbit[IO](config)
+val client: Fs2Rabbit = Fs2Rabbit(config)
 
-val rabbitDeps: Resource[IO, (Acker, Consumer)] = for {
+val rabbitDeps: Resource[(Acker, Consumer)] = for {
   channel <- client.createConnectionChannel // resource opening a connection to a channel
   (acker, consumer) <- Resource.liftF( // lift an IO which creates the consumer
     client.createAckerConsumer[Try[OrderCreatedEvent]](
@@ -462,7 +462,7 @@ val rabbitDeps: Resource[IO, (Acker, Consumer)] = for {
 
 ```scala
 type Consumer = 
-  Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]]
+  Stream[AmqpEnvelope[Try[OrderCreatedEvent]]]
 ```
 
 ---
@@ -572,7 +572,7 @@ class Collection(
 ```scala
 object Mongo {
   ...
- def collectionFrom(conf: Config): Resource[IO, Collection] = {
+ def collectionFrom(conf: Config): Resource[Collection] = {
   val clientSettings = ??? // conf to mongo-scala-driver settings
   
   Resource
@@ -634,7 +634,10 @@ object EventRepository {
 # 3.2 Store the model to the given collection
 
 ```scala
-class OrderHistoryProjector(eventRepo: EventRepository,  consumer: Consumer,  acker: Acker,  logger: Logger) {
+class OrderHistoryProjector(eventRepo: EventRepository,  
+                            consumer: Consumer,  
+                            acker: Acker,  
+                            logger: Logger) {
   val project: IO[Unit] =
     consumer.evalMap { envelope =>
       envelope.payload match {
@@ -727,7 +730,7 @@ class OrderHistoryProjector private (
 object OrderHistoryProjector {
   def fromConfigs(mongoConfig: Mongo.Config,
                   rabbitConfig: Fs2RabbitConfig
-  ): Resource[IO, OrderHistoryProjector] = ...
+  ): Resource[OrderHistoryProjector] = ...
 }
 ```
 
@@ -740,10 +743,10 @@ object OrderHistoryProjector {
   def fromConfigs(
     mongoConfig: Mongo.Config,
     rabbitConfig: Fs2RabbitConfig
-  ): Resource[IO, OrderHistoryProjector] =
+  ): Resource[OrderHistoryProjector] =
     for {
       collection        <- Mongo.collectionFrom(mongoConfig)
-      logger            <- Resource.liftF(Slf4jLogger.create[IO])
+      logger            <- Resource.liftF(Slf4jLogger.create)
       (acker, consumer) <- Rabbit.consumerFrom(
                             rabbitConfig,
                             eventDecoder)
@@ -869,13 +872,13 @@ class Collection private (
   ...
   def find(document: Document, 
            skip: Int, 
-           limit: Int): Stream[IO, Document] =
+           limit: Int): Stream[Document] =
     wrapped
       .find(document)
       .skip(skip)
       .limit(limit)
       .toPublisher
-      .toStream[IO]()
+      .toStream()
 }
 ```
 - Wrapping `mongo-scala-driver` types, exposing `Stream` via extension methods (and reactive streams interoperation)
@@ -912,7 +915,7 @@ def fromCollection(collection: Collection): OrderRepository =
            "company" -> company.value
          )
        )
-       .compile.toList // Stream[IO, Document] -> IO[List[Document]]
+       .compile.toList // Stream[Document] -> IO[List[Document]]
        .flatMap(_.traverse(doc => IO.fromTry(Order.fromBson(doc)))) // IO[List[Document]] -> IO[List[Order]]
   }
 }
@@ -1047,7 +1050,7 @@ object Email {
 - combining _path variables_ and _query param_ extractors!
 
 ```scala
-HttpRoutes.of[IO] {
+HttpRoutes.of {
  case GET -> Root / CompanyVar(company) / "orders" :? EmailQueryParam(email) => ???
  case GET -> Root / "other"                                                  => ???
 }
@@ -1073,15 +1076,13 @@ The api application should:
 
 # http4s routes - explained
 
-`HttpRoutes[IO]` is an alias for 
-`Kleisli[OptionT[IO, ?], Request, Response]`
- 
-Which can be rewritten (more or less..) to 
+`HttpRoutes` is a function 
 `Request => IO[Option[Response]]`
 
 The `orNotFound` extension method will handle the case whether the request won't match any route, returning a `404`
 
-Our routes are now `Request => IO[Response]`
+So that our function is now
+`Request => IO[Response]`
 
 [.footer: NB: not 100% accurate, but close enough]
 
@@ -1092,8 +1093,8 @@ Our routes are now `Request => IO[Response]`
 ```scala
 object OrderHistoryRoutes {
   def fromRepo(
-   orderRepository: OrderRepository): HttpRoutes[IO] = 
-     HttpRoutes.of[IO] {
+   orderRepository: OrderRepository): HttpRoutes = 
+     HttpRoutes.of {
        case GET -> Root / CompanyVar(company) / "orders" :? EmailQueryParam(email) =>
                orderRepository
                  .findBy(email, company)
@@ -1122,7 +1123,7 @@ The api application should:
 # Setting up the server
 
 ```scala
-class OrderHistory private (routes: HttpRoutes[IO]) {
+class OrderHistory private (routes: HttpRoutes) {
   val serve: IO[Unit] =
     BlazeServerBuilder[IO]
      .bindHttp(80, "0.0.0.0")
@@ -1132,7 +1133,7 @@ class OrderHistory private (routes: HttpRoutes[IO]) {
 }
 
 object OrderHistory {
- def fromConfig(config: Mongo.Config): Resource[IO, OrderHistory] =
+ def fromConfig(config: Mongo.Config): Resource[OrderHistory] =
     Mongo
      .collectionFrom(mongoConfig)
      .map { collection =>
@@ -1170,6 +1171,11 @@ object OrderHistoryApp extends IOApp {
 ---
 
 # Things I'm not telling you
+## _Testing_
+
+---
+
+# Things I'm not telling you
 ## _Typeclasses_
 
 ---
@@ -1177,6 +1183,27 @@ object OrderHistoryApp extends IOApp {
 # Things I'm not telling you
 ## _Higher Kinded Types_
 
+---
+
+# Things I'm not telling you
+## _Tagless final_
+
+---
+
+# I've been lying to you
+#### _Stream, Resource, Fs2Rabbit and HttpRoutes are polymorphic in the effect type!
+
+In all the slides I always omitted the additional effect type parameter!
+
+
+- `Resource[F, A]`
+- `Stream[F, A]`
+- `Fs2Rabbit[F]`
+- `HttpRoutes[F]`
+
+#### Polymorphism is great, but comes at a cost!
+
+<!--
 ---
 
 [.code-highlight: all]
@@ -1195,22 +1222,17 @@ object OrderHistory {
   def fromConfig(
    mongoConfig: Mongo.Config)(
    implicit ce: ContextShift[IO], ti: Timer[IO]
-   ): Resource[IO, OrderHistory] =
+   ): Resource[OrderHistory] =
 } 
 ```
+
 ---
 
 ## Appendix: What does it mean polymorphic in the effect type `F[_]`?
 - let's suppose you want to provide a _library_ which does some kind of IO operation (e.g. interacting with a DB)
 - and there exist _multiple effect libraries_ in the ecosystem (e.g. cats-effect `IO`, monix `Task`, zio `ZIO`, etc..)
 - cats-effect provides __a set of typeclasses__ which let us build IO libraries/applications __without committing to a specific IO implementation__!
-
----
-
-# Things I'm not telling you
-## Testing
-###### _Nobody really needs mockito_
-
+-->
 ---
 
 # Conclusions
