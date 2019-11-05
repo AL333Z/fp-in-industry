@@ -892,12 +892,12 @@ class Collection private (
 ```scala
 trait OrderRepository {
   def findBy(email: Email, 
-             company: Company): IO[List[Order]]
+             company: Company,
+             pagingCriteria: PagingCriteria): IO[List[Order]]
 }
 
 object OrderRepository {
-  def fromCollection(
-    collection: Collection): OrderRepository = ???
+  def fromCollection(collection: Collection): OrderRepository = ???
 }
 ```
 ---
@@ -907,13 +907,15 @@ object OrderRepository {
 ```scala
 def fromCollection(collection: Collection): OrderRepository = 
   new OrderRepository {
-    def findBy(email: Email, company: Company): IO[List[Order]] = 
+    def findBy(email: Email, company: Company, pagingCriteria: PagingCriteria): IO[List[Order]] = 
       collection
        .find(
-         Document(
+         document = Document(
            "email"   -> email.value,
            "company" -> company.value
-         )
+         ),
+         skip = pagingCriteria.pageNo.value * pagingCriteria.pageSize.value,
+         limit = pagingCriteria.pageSize.value
        )
        .compile.toList // Stream[Document] -> IO[List[Document]]
        .flatMap(_.traverse(doc => IO.fromTry(Order.fromBson(doc)))) // IO[List[Document]] -> IO[List[Order]]
@@ -950,21 +952,32 @@ Not reinventing the wheel, just using `http4s` lib
 # 3.1 Define routes
 
 ## Route to match against
-`GET /:company/orders?email={email}`
+```
+GET /:company/orders 
+                    ?email={email}
+                      &pageNo={pageNo}
+                        &pageSize={pageSize}
+```
 
 ---
 
 ## Matching to value types
 
-`GET /:company/orders?email={email}`
+```
+GET /:company/orders?email={email}&pageNo={pageNo}&pageSize={pageSize}
+```
 
 ```scala
 case class Company(value: String)
 
 case class Email(value: String)
+
+case class PageNo(value: Int)
+case class PageSize(value: Int)
+case class PagingCriteria(pageNo: PageNo, pageSize: PageSize)
 ```
 
-Match on path variables and query parameters, avoiding primitive types (`String`, `Int`, `Boolean`)
+Match on path variables and query parameters, avoiding primitive types
 
 ---
 
@@ -1021,44 +1034,31 @@ object CompanyVar {
 
 ---
 
-# Matching on query params
+# Matching on _query params_
 
-Also performing validations...
+Also performing validations
 
-```scala
-object Email {
- // incomplete..
- private def validate(x: String): Option[String] = """(\w+)@([\w\.]+)""".r.findFirstIn(x)
-   
- val decoder: QueryParamDecoder[Email] = value =>
-   validate(value.value)
-   .map(Email(_))
-   .toValidNel(ParseFailure("Invalid Email", value.value) 
-
- object EmailQueryParam extends QueryParamDecoderMatcher[Email]("email")(decoder)
-}
-```
-
-- A bit tricky at first, but really poweful
-- Returns a `BadRequest` in case the _validation fails_
+- similar to path variable matcher
+- may return a `BadRequest` in case the _validation fails_
 
 ---
 
 # 3.1 Define routes
 
-- `HttpRoutes` are constructed by **pattern matching** the request
-- combining _path variables_ and _query param_ extractors!
+`HttpRoutes` are constructed by **pattern matching** the request
 
 ```scala
 HttpRoutes.of {
- case GET -> Root / CompanyVar(company) / "orders" :? EmailQueryParam(email) => ???
- case GET -> Root / "other"                                                  => ???
+ case GET -> Root / CompanyVar(company) / "orders" 
+                  :? EmailQueryParam(email) 
+                  :& PagingCritQueryParam(pagingCriteria)  => ???
+ case GET -> Root / "other"                                => ???
 }
 ```
 
-- will match `/ACME/orders?email=asd@sdf.com`
-- will return 400 on `/ACME/orders?email=notanemail`
-- will return 404 on `/foo`
+- will _match_ `/ACME/orders?email=asd@sdf.com`
+- will return _400_ on `/ACME/orders?email=notanemail`
+- will return _404_ on `/foo`
 
 ---
 
@@ -1076,7 +1076,7 @@ The api application should:
 
 # http4s routes - explained
 
-`HttpRoutes` is a function 
+`HttpRoutes` is a partial function 
 `Request => IO[Option[Response]]`
 
 The `orNotFound` extension method will handle the case whether the request won't match any route, returning a `404`
@@ -1088,23 +1088,28 @@ So that our function is now
 
 ---
 
+[.code-highlight: all]
+[.code-highlight: 2]
+[.code-highlight: 3,10]
+[.code-highlight: 4-6]
+[.code-highlight: 7-9]
+[.code-highlight: all]
+
 # 3.2 Implement each route, querying the projection
 
 ```scala
 object OrderHistoryRoutes {
-  def fromRepo(
-   orderRepository: OrderRepository): HttpRoutes = 
+  def fromRepo(orderRepository: OrderRepository): HttpRoutes = 
      HttpRoutes.of {
-       case GET -> Root / CompanyVar(company) / "orders" :? EmailQueryParam(email) =>
+       case GET -> Root / CompanyVar(company) / "orders" 
+                        :? EmailQueryParam(email) 
+                        :& PagingCritQueryParam(pagingCriteria)=>
                orderRepository
-                 .findBy(email, company)
-                 .flatMap(res => Ok(res.asJson))
+                 .findBy(email, company, pagingCriteria)
+                 .flatMap(res => Ok(res.asJson)) // 200
      }
 } 
 ```
-
-- smart constructor, _building routes_
-- _returning_ `200` for the happy path
 
 ---
 
@@ -1191,7 +1196,7 @@ object OrderHistoryApp extends IOApp {
 ---
 
 # I've been lying to you
-#### _Stream, Resource, Fs2Rabbit and HttpRoutes are polymorphic in the effect type!
+#### _Stream, Resource, Fs2Rabbit and HttpRoutes are polymorphic in the effect type!_
 
 In all the slides I always omitted the additional effect type parameter!
 
