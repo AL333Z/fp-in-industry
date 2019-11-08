@@ -165,6 +165,11 @@ A value of type `IO[A]` is a computation that, when evaluated, can perform __eff
 
 ---
 
+[.code-highlight: none]
+[.code-highlight: 1-8]
+[.code-highlight: 10-15]
+[.code-highlight: all]
+
 # IO and combinators
 
 ```scala
@@ -191,6 +196,9 @@ class IO[A] {
 
 [.code-highlight: none]
 [.code-highlight: 1]
+[.code-highlight: 3-5]
+[.code-highlight: 3-6]
+[.code-highlight: 3-7]
 [.code-highlight: all]
 
 ```scala
@@ -218,8 +226,8 @@ RuntimeException: boom!
 
 ---
 
-[.code-highlight: 2-3]
-[.code-highlight: 7,13]
+[.code-highlight: 1-3, 15]
+[.code-highlight: 1, 5-7,13-15]
 [.code-highlight: all]
 
 # 1. Read a bunch of configs from the env
@@ -265,8 +273,7 @@ Who's gonna **_run_** the suspended computation then?
 
 ---
 
-[.code-highlight: all]
-[.code-highlight: 2]
+[.code-highlight: 1-2,8]
 [.code-highlight: all]
 
 # *End of the world*
@@ -331,6 +338,10 @@ val channel: Resource[AMQPChannel] = client.createConnectionChannel
 
 ---
 
+[.code-highlight: 1-5]
+[.code-highlight: 7-13]
+[.code-highlight: all]
+
 # Introducing Resource
 
 ```scala
@@ -375,7 +386,7 @@ class Resource[F[_], A] {
 ---
 -->
 
-[.code-highlight: 1]
+[.code-highlight: 1,9]
 [.code-highlight: 2-3]
 [.code-highlight: 5-6]
 [.code-highlight: 8]
@@ -397,6 +408,10 @@ def mkResource(s: String): Resource[String] = {
 ```
 ---
 
+[.code-highlight: 1-3]
+[.code-highlight: 1-4]
+[.code-highlight: all]
+
 # Using a Resource
 
 ```scala
@@ -409,6 +424,8 @@ val r: Resource[(String, String)] =
 r.use { case (a, b) => IO.delay(println(s"Using $a and $b")) } // IO[Unit]
 ```
 
+[.code-highlight: none]
+[.code-highlight: all]
 ```
 Output:
 Acquiring outer
@@ -428,19 +445,15 @@ Releasing outer
 
 ---
 
-[.code-highlight: all]
-[.code-highlight: 7]
-[.code-highlight: 8]
-[.code-highlight: 9-14]
-[.code-highlight: 16]
+[.code-highlight: 4]
+[.code-highlight: 6-10]
+[.code-highlight: 5-12]
+[.code-highlight: 13]
 [.code-highlight: all]
 
 # 2.1. Interact with a RabbitMQ broker
 
-```scala 
-type Acker = AckResult => IO[Unit] 
-type Consumer = Stream[AmqpEnvelope[Try[OrderCreatedEvent]]]
-
+```scala
 val client: Fs2Rabbit = Fs2Rabbit(config)
 
 val rabbitDeps: Resource[(Acker, Consumer)] = for {
@@ -454,6 +467,9 @@ val rabbitDeps: Resource[(Acker, Consumer)] = for {
     )
   )
 } yield (acker, consumer)
+
+type Acker = AckResult => IO[Unit]
+type Consumer = Stream[AmqpEnvelope[Try[OrderCreatedEvent]]]
 ```
 
 ---
@@ -497,7 +513,8 @@ class Stream[O]{
 
 ---
 
-[.code-highlight: all]
+[.code-highlight: 1,14]
+[.code-highlight: 2]
 [.code-highlight: 3,12]
 [.code-highlight: 4-11]
 [.code-highlight: all]
@@ -551,6 +568,10 @@ In this case:
 
 ---
 
+[.code-highlight: 1,2,9]
+[.code-highlight: 4-8]
+[.code-highlight: all]
+
 # "Wrap the crap"
 
 ```scala
@@ -566,6 +587,13 @@ class Collection(
 ```
 
 ---
+
+[.code-highlight: 1,14]
+[.code-highlight: 3,13]
+[.code-highlight: 3-4,13]
+[.code-highlight: 3,6-7,13]
+[.code-highlight: 3,6-12,13]
+[.code-highlight: all]
 
 # 3.1 Open a connection
 
@@ -598,8 +626,8 @@ object Mongo {
 
 ---
 
-[.code-highlight: all]
-[.code-highlight: 8,15]
+[.code-highlight: 1-3]
+[.code-highlight: 5-6,16-17]
 [.code-highlight: all]
 
 # 3.2 Store the model to the given collection
@@ -626,9 +654,8 @@ object EventRepository {
 
 ---
 
-[.code-highlight: all]
 [.code-highlight: 1]
-[.code-highlight: 7]
+[.code-highlight: 10]
 [.code-highlight: all]
 
 # 3.2 Store the model to the given collection
@@ -711,9 +738,8 @@ How to achieve _dependency inversion_?
 
 ---
 
-[.code-highlight: all]
 [.code-highlight: 1]
-[.code-highlight: 10-12]
+[.code-highlight: 9-13]
 [.code-highlight: all]
 
 # Wiring - Constructor Injection
@@ -764,7 +790,6 @@ object OrderHistoryProjector {
 
 ---
 
-[.code-highlight: all]
 [.code-highlight: 9-11]
 [.code-highlight: all]
 
@@ -1088,7 +1113,6 @@ So that our function is now
 
 ---
 
-[.code-highlight: all]
 [.code-highlight: 2]
 [.code-highlight: 3,10]
 [.code-highlight: 4-6]
