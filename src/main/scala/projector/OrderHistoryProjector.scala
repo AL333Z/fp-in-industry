@@ -1,6 +1,6 @@
 package projector
 
-import cats.effect.{ Blocker, ConcurrentEffect, ContextShift, IO, Resource }
+import cats.effect.{ ConcurrentEffect, IO, Resource }
 import cats.implicits._
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
 import dev.profunktor.fs2rabbit.model.{ AckResult, AmqpEnvelope }
@@ -43,16 +43,12 @@ object OrderHistoryProjector {
   def fromConfigs(
     mongoConfig: Mongo.Config,
     rabbitConfig: Fs2RabbitConfig
-  )(implicit ce: ConcurrentEffect[IO], cs: ContextShift[IO]): Resource[IO, OrderHistoryProjector] =
+  )(implicit ce: ConcurrentEffect[IO]): Resource[IO, OrderHistoryProjector] =
     for {
       collection <- Mongo.collectionFrom(mongoConfig)
       logger     <- Resource.liftF(Slf4jLogger.create[IO])
-      // FIXME used only for publish ops, so here it's pretty useless..
-      // waiting for https://github.com/profunktor/fs2-rabbit/pull/255 to be released
-      blocker <- Blocker.apply[IO]
       (acker, consumer) <- Rabbit.consumerFrom(
                             rabbitConfig,
-                            blocker,
                             OrderCreatedEvent.orderCreatedEventEnvelopeDecoder
                           )
       repo = EventRepository.fromCollection(collection)

@@ -1,11 +1,13 @@
 package rabbit
 
 import cats.data.NonEmptyList
-import cats.effect.{ Blocker, ConcurrentEffect, ContextShift, IO, Resource }
+import cats.effect.{ ConcurrentEffect, IO, Resource }
+import dev.profunktor.fs2rabbit.algebra.ConnectionResource
 import dev.profunktor.fs2rabbit.config.{ Fs2RabbitConfig, Fs2RabbitNodeConfig }
 import dev.profunktor.fs2rabbit.effects.EnvelopeDecoder
-import dev.profunktor.fs2rabbit.interpreter.Fs2Rabbit
+import dev.profunktor.fs2rabbit.interpreter.LiveInternalQueue
 import dev.profunktor.fs2rabbit.model.{ AckResult, AmqpEnvelope, BasicQos, QueueName }
+import dev.profunktor.fs2rabbit.program.AckConsumingProgram
 import fs2.Stream
 import projector.event.OrderCreatedEvent
 
@@ -45,19 +47,20 @@ object Rabbit {
     }
   }
 
-  def consumerFrom(config: Fs2RabbitConfig, blocker: Blocker, decoder: EnvelopeDecoder[IO, Try[OrderCreatedEvent]])(
-    implicit ce: ConcurrentEffect[IO],
-    cs: ContextShift[IO]
+  def consumerFrom(config: Fs2RabbitConfig, decoder: EnvelopeDecoder[IO, Try[OrderCreatedEvent]])(
+    implicit ce: ConcurrentEffect[IO]
   ): Resource[IO, (AckResult => IO[Unit], Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]])] =
     for {
-      client  <- Resource.liftF[IO, Fs2Rabbit[IO]](Fs2Rabbit[IO](config, blocker))
-      channel <- client.createConnectionChannel
+      connEff          <- Resource.liftF(ConnectionResource.make[IO](config))
+      internalQ        = new LiveInternalQueue[IO](config.internalQueueSize.getOrElse(500))
+      ackConsumingProg <- Resource.liftF(AckConsumingProgram.make[IO](config, internalQ))
+      channel          <- connEff.createConnection.flatMap(connEff.createChannel)
       (acker, consumer) <- Resource.liftF(
-                            client.createAckerConsumer[Try[OrderCreatedEvent]](QueueName("EventsFromOms"),
-                                                                               BasicQos(0, 10))(
+                            ackConsumingProg.createAckerConsumer[Try[OrderCreatedEvent]](
                               channel,
-                              decoder
-                            )
+                              QueueName("EventsFromOms"),
+                              BasicQos(0, 10)
+                            )(decoder)
                           )
     } yield (acker, consumer)
 }
