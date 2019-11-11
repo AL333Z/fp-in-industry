@@ -82,7 +82,7 @@ Why not.
 ![Inline, 70%](pics/arch-white.png)
 
 - a component which projects a model, in a MongoDB collection
-- so that an HTTP service can queries the collection returning orders
+- a simple HTTP service, which queries the collection returning orders
 
 ^ Talk ONLY about COMPONENTS!
 
@@ -92,7 +92,7 @@ Why not.
 
 Our focus here is **_NOT_** on the System Architecture
 
-We'll just put our attention on _implementing an architecture component_ (the projector) using Pure Functional Programming, in Scala
+We'll just put our attention on _implementing architecture components_ using Pure Functional Programming, in Scala
 
 ---
 
@@ -814,9 +814,384 @@ object OrderHistoryProjectorApp extends IOApp {
 
 ---
 
-# All done!
+# End of part 1
 
 ![inline](pics/meme1.jpg)
+
+---
+# Sample Architecture: Order History Service
+
+![Inline, 80%](pics/arch-white.png)
+
+---
+
+# Let's move to the other half..
+
+---
+
+# Building an HTTP api
+
+![Inline, 80%](pics/api-white.png)
+
+---
+
+# Order History API
+1. read a bunch of configs from the env
+2. interact with a MongoDB cluster
+2.1 open a connection
+2.2 read the model from the collection
+3. expose a bunch of HTTP routes
+3.1 define routes
+3.2 implement each route, querying the projection
+
+---
+
+# You already know most of the things!
+
+---
+
+# You already know most of the things!
+
+How to:
+- handle effects with `IO`
+- acquire/release `Resources`
+- achieve _dependency inversion_, via constructor injection
+
+---
+
+# Building an HTTP api - Main
+
+```scala
+object OrderHistoryApp extends IOApp {
+  def run(args: List[String]): IO[ExitCode] =
+    for {
+      mongoConfig <- Mongo.Config.load
+      _ <- OrderHistory
+            .fromConfig(mongoConfig)
+            .use(_.serve)
+    } yield ExitCode.Success
+}
+```
+
+Looks familiar already...
+
+---
+
+# The plan
+The api application should:
+1. ~~read a bunch of configs from the env~~
+2. interact with a MongoDB cluster
+2.1 ~~open a connection~~
+2.2 read the model from the collection
+3. expose a bunch of HTTP routes
+3.1 define routes
+3.2 implement each route, querying the projection
+
+---
+
+# 2.2 Read the model from the collection
+
+```scala
+class Collection private (
+ private val wrapped: MongoCollection[Document]) {
+  ...
+  def find(document: Document, 
+           skip: Int, 
+           limit: Int): Stream[Document] =
+    wrapped
+      .find(document)
+      .skip(skip)
+      .limit(limit)
+      .toPublisher
+      .toStream()
+}
+```
+- Wrapping `mongo-scala-driver` types, exposing `Stream` via extension methods (and reactive streams interoperation)
+- The double conversion is probably not ideal, but easy enough to be presented here
+
+---
+
+# 2.2 Read the model from the collection
+### Interface + smart constructor
+
+```scala
+trait OrderRepository {
+  def findBy(email: Email, 
+             company: Company,
+             pagingCriteria: PagingCriteria): IO[List[Order]]
+}
+
+object OrderRepository {
+  def fromCollection(collection: Collection): OrderRepository = ???
+}
+```
+---
+# 2.2 Read the model from the collection
+### Implementation
+
+```scala
+def fromCollection(collection: Collection): OrderRepository = 
+  new OrderRepository {
+    def findBy(email: Email, company: Company, pagingCriteria: PagingCriteria): IO[List[Order]] = 
+      collection
+       .find(
+         document = Document(
+           "email"   -> email.value,
+           "company" -> company.value
+         ),
+         skip = pagingCriteria.pageNo.value * pagingCriteria.pageSize.value,
+         limit = pagingCriteria.pageSize.value
+       )
+       .compile.toList // Stream[Document] -> IO[List[Document]]
+       .flatMap(_.traverse(doc => IO.fromTry(Order.fromBson(doc)))) // IO[List[Document]] -> IO[List[Order]]
+  }
+}
+```
+---
+
+# The plan
+The api application should:
+1. ~~read a bunch of configs from the env~~
+2. ~~interact with a MongoDB cluster~~
+2.1 ~~open a connection~~
+2.2 ~~read the model from the collection~~
+3. expose a bunch of HTTP routes
+3.1 define routes
+3.2 implement each route, querying the projection
+
+---
+
+# 3. Expose a bunch of HTTP routes
+Not reinventing the wheel, just using `http4s` lib
+
+---
+
+# Why http4s 
+- convenient DSL
+- integrates with `IO` and `Stream`
+- supports cancellation
+- integrates with many libs for serialization-deserialization (circe, scala-xml, etc..)
+
+---
+
+# 3.1 Define routes
+
+## Route to match against
+```
+GET /:company/orders 
+                    ?email={email}
+                      &pageNo={pageNo}
+                        &pageSize={pageSize}
+```
+
+---
+
+## Matching to value types
+
+```
+GET /:company/orders?email={email}&pageNo={pageNo}&pageSize={pageSize}
+```
+
+```scala
+case class Company(value: String)
+
+case class Email(value: String)
+
+case class PageNo(value: Int)
+case class PageSize(value: Int)
+case class PagingCriteria(pageNo: PageNo, pageSize: PageSize)
+```
+
+Match on path variables and query parameters, avoiding primitive types
+
+---
+
+[.code-highlight: all]
+[.code-highlight: 2]
+[.code-highlight: all]
+
+# Matching on _path variables_
+
+Using _extractor objects_
+
+```scala
+object CompanyVar {
+  def unapply(arg: String): Option[Company] = 
+    if (arg != "") 
+      Some(Company(arg))
+    else 
+      None
+}
+```
+
+---
+
+# Matching on _path variables_
+
+Enabling __pattern matching__ toward value types
+
+```scala
+ def sample(s: String) = s match {
+   case CompanyVar(x) => println("matched Company: " + x)
+   case _             => println("not matched")
+ }
+ 
+ sample("matched: ACME") // Company(ACME)
+ sample("")              // not matched
+```
+
+---
+
+# Matching on _path variables_
+
+```scala
+object CompanyVar {
+  def unapply(arg: String): Option[Company] = 
+    if (arg != "") 
+      Some(Company(arg))
+    else 
+      None
+}
+```
+
+- can be _composed_ with other extractors
+- in case of `None`, the route is not matched and the next one is tried
+
+---
+
+# Matching on _query params_
+
+Also performing validations
+
+- similar to path variable matcher
+- may return a `BadRequest` in case the _validation fails_
+
+---
+
+# 3.1 Define routes
+
+`HttpRoutes` are constructed by **pattern matching** the request
+
+```scala
+HttpRoutes.of {
+ case GET -> Root / CompanyVar(company) / "orders" 
+                  :? EmailQueryParam(email) 
+                  :& PagingCritQueryParam(pagingCriteria)  => ???
+ case GET -> Root / "other"                                => ???
+}
+```
+
+- will _match_ `/ACME/orders?email=asd@sdf.com`
+- will return _400_ on `/ACME/orders?email=notanemail`
+- will return _404_ on `/foo`
+
+---
+
+# The plan
+The api application should:
+1. ~~read a bunch of configs from the env~~
+2. ~~interact with a MongoDB cluster~~
+2.1 ~~open a connection~~
+2.2 ~~read the model from the collection~~
+3. expose a bunch of HTTP routes
+3.1 ~~define routes~~
+3.2 implement each route, querying the projection
+
+---
+
+# http4s routes - explained
+
+`HttpRoutes` is a partial function 
+`Request => IO[Option[Response]]`
+
+The `orNotFound` extension method will handle the case whether the request won't match any route, returning a `404`
+
+So that our function is now
+`Request => IO[Response]`
+
+[.footer: NB: not 100% accurate, but close enough]
+
+---
+
+[.code-highlight: 2]
+[.code-highlight: 3,10]
+[.code-highlight: 4-6]
+[.code-highlight: 7-9]
+[.code-highlight: all]
+
+# 3.2 Implement each route, querying the projection
+
+```scala
+object OrderHistoryRoutes {
+  def fromRepo(orderRepository: OrderRepository): HttpRoutes = 
+     HttpRoutes.of {
+       case GET -> Root / CompanyVar(company) / "orders" 
+                        :? EmailQueryParam(email) 
+                        :& PagingCritQueryParam(pagingCriteria)=>
+               orderRepository
+                 .findBy(email, company, pagingCriteria)
+                 .flatMap(res => Ok(res.asJson)) // 200
+     }
+} 
+```
+
+---
+
+# The plan
+The api application should:
+1. ~~read a bunch of configs from the env~~
+2. ~~interact with a MongoDB cluster~~
+2.1 ~~open a connection~~
+2.2 ~~read the model from the collection~~
+3. ~~expose a bunch of HTTP routes~~
+3.1 ~~define routes~~
+3.2 ~~implement each route, querying the projection~~
+
+---
+
+# Setting up the server
+
+```scala
+class OrderHistory private (routes: HttpRoutes) {
+  val serve: IO[Unit] =
+    BlazeServerBuilder[IO]
+     .bindHttp(80, "0.0.0.0")
+     .withHttpApp(routes.orNotFound)
+     .serve
+     .compile.drain
+}
+
+object OrderHistory {
+ def fromConfig(config: Mongo.Config): Resource[OrderHistory] =
+    Mongo
+     .collectionFrom(mongoConfig)
+     .map { collection =>
+       val repo    = OrderRepository.fromCollection(collection)
+       val service = OrderHistoryRoutes.fromRepo(repo)
+       new OrderHistory(service)
+     }
+}
+```
+---
+
+# Building an HTTP api - Main
+
+```scala
+object OrderHistoryApp extends IOApp {
+  def run(args: List[String]): IO[ExitCode] =
+    for {
+      mongoConfig <- Mongo.Config.load
+
+      _ <- OrderHistory
+            .fromConfig(mongoConfig)
+            .use(_.serve)
+
+    } yield ExitCode.Success
+}
+```
+---
+
+# All done!
 
 ---
 
@@ -857,11 +1232,41 @@ In all the slides I always omitted the additional effect type parameter!
 
 #### Polymorphism is great, but comes at a cost!
 
+<!--
+---
+
+[.code-highlight: all]
+[.code-highlight: 4]
+[.code-highlight: all]
+
+# Things I'm not telling you
+## _Implicits dependencies_
+
+- `fs2`, `fs2-rabbit` and `http4s` are _polymorphic_ in the effect type `F[_]`
+- I only showed you its usage with `IO`..
+- If you actually look at the code in the repo, you'll see something like:
+
+```scala
+object OrderHistory {
+  def fromConfig(
+   mongoConfig: Mongo.Config)(
+   implicit ce: ContextShift[IO], ti: Timer[IO]
+   ): Resource[OrderHistory] =
+} 
+```
+
+---
+
+## Appendix: What does it mean polymorphic in the effect type `F[_]`?
+- let's suppose you want to provide a _library_ which does some kind of IO operation (e.g. interacting with a DB)
+- and there exist _multiple effect libraries_ in the ecosystem (e.g. cats-effect `IO`, monix `Task`, zio `ZIO`, etc..)
+- cats-effect provides __a set of typeclasses__ which let us build IO libraries/applications __without committing to a specific IO implementation__!
+-->
 ---
 
 # Conclusions
 
-- a production-ready component in under 300 LOC
+- 2 production-ready components in under 600 LOC
 - only _3 main datatypes_: `IO`, `Resource`, `Stream`
 - no _variables_, no _mutable state_
 - no fancy abstractions
@@ -879,4 +1284,5 @@ In all the slides I always omitted the additional effect type parameter!
 https://github.com/AL333Z/fp-in-industry
 https://typelevel.org/cats-effect/
 https://fs2.io/
+https://http4s.org/
 https://fs2-rabbit.profunktor.dev/
