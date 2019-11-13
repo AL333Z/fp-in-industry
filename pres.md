@@ -18,7 +18,7 @@ header-strong: #C44D58
 
 ## _@al333z_
 ### Software Engineer
-### Member of _FP in Bologna_ ![inline 10%](pics/fpinbo.jpg)
+### Member of _@FPinBO_ ![inline 10%](pics/fpinbo.jpg)
 ### Runner
 
 ![right](pics/pic.jpg)
@@ -43,7 +43,7 @@ Why not.
 # Why Functional Programming?
 
 - Built on __solid foundations__, but there's no need to be a mathematician to be a functional programmer!
-- Offers __abstractions and tecniques__ to solve concrete problems
+- Offers __abstractions and techniques__ to solve concrete problems
 - Improves code reuse, through __composition__
 - Let us build programs which are **_simpler to reason about_**
 
@@ -70,7 +70,7 @@ Why not.
 
 ![Inline, 70%](pics/arch-white.png)
 
-- Let's assume we are provided with domain events from an Order Managment Platform (e.g. OrderCreated), via a RabbitMQ broker
+- Let's assume we are provided with domain events from an Order Management Platform (e.g. OrderCreated), via a RabbitMQ broker
 - We need to build an Order History Service
 
 ^ Talk ONLY about REQUIREMENTS!
@@ -175,7 +175,6 @@ A value of type `IO[A]` is a computation that, when evaluated, can perform __eff
 ```scala
 object IO {
   def delay[A](a: => A): IO[A]
-  def async[A](k: (Either[Throwable, A] => Unit) => Unit): IO[A]
   def pure[A](a: A): IO[A]
   def raiseError[A](e: Throwable): IO[A]
   def sleep(duration: FiniteDuration): IO[Unit] 
@@ -199,6 +198,7 @@ class IO[A] {
 [.code-highlight: 3-5]
 [.code-highlight: 3-6]
 [.code-highlight: 3-7]
+[.code-highlight: 3-9]
 [.code-highlight: all]
 
 ```scala
@@ -208,18 +208,15 @@ val program: IO[Unit] =
  for {
     i1 <- ioInt
     _  <- IO.sleep(i.second)
-    _  <- IO.raiseError(new RuntimeException("boom!"))
+    _  <- IO.raiseError(new RuntimeException("boom!")) // not throwing!
     i2 <- ioInt // not executed, comps is short-circuted
  } yield ()
+
+> Output:
+> hey
+> RuntimeException: boom!
 ```
 
-[.code-highlight: none]
-[.code-highlight: all]
-```
-Output:
-hey
-RuntimeException: boom!
-```
 ---
 
 # Putting things in practice!
@@ -239,13 +236,12 @@ object Mongo {
   
   object Config {
     // a delayed computation which read from env variables
-    val load: IO[Config] = IO.delay {     
-      val user     = Option(System.getenv("MONGO_USERNAME"))
-      val password = Option(System.getenv("MONGO_PASSWORD"))
-      val auth = (user, password).mapN(Auth)
-      //...reading other env vars ... //
-      Config(auth, endpoints, port, db, collection)
-    }
+    val load: IO[Config] =
+      for {
+        user     <- Option.delay(System.getenv("MONGO_USERNAME"))
+        password <- Option.delay(System.getenv("MONGO_PASSWORD"))
+        //...reading other env vars ... //
+      } yield Config(Auth(user, password), endpoints, port, db, collection)
   }
 }
 ```
@@ -364,34 +360,12 @@ class Resource[A] {
 ^ A note on the simplification
 
 ---
-<!--
-
-## Resource is polymorphic on its effect type
-
-```scala
-object Resource {
-  def make[F[_], A](
-    acquire: F[A])(
-    release: A => F[Unit]): Resource[F, A]
-}
-
-class Resource[F[_], A] {
-  def use[B](f: A => F[B]): F[B]
-
-  def map[B](f: A => B): Resource[F, B]
-  def flatMap[B](f: A => Resource[F, B]): Resource[F, B]
-  ...
-}
-```
----
--->
 
 [.code-highlight: 1,9]
 [.code-highlight: 2-3]
 [.code-highlight: 5-6]
 [.code-highlight: 8]
 [.code-highlight: all]
-
 
 # Making a Resource
 
@@ -509,7 +483,17 @@ class Stream[O]{
 
 --- 
 
-// TODO something more on Stream
+# Introducing Stream
+
+```scala
+Stream(1,2,3)
+  .repeat
+  .evalMap(i => IO.delay(println(i))
+  .compile
+  .drain
+```
+
+A sequence of effects...
 
 ---
 
@@ -715,7 +699,7 @@ How to achieve _dependency inversion_?
 
 - **I don't like _suffering_**
 - JVM application lifecycle is not so complex
-- `IO`, `SafeApp`, `Resource`, `Stream` are handling properly termination events
+- `IO`, `IOApp`, `Resource`, `Stream` are handling properly termination events
 
 ---
 
@@ -785,7 +769,7 @@ object OrderHistoryProjector {
 
 # Wiring - Constructor Injection
 
-- **No magic at all**, each dependency is explicitely passed in the *smart constructor* of each component
+- **No magic at all**, each dependency is explicitly passed in the *smart constructor* of each component
 - Acquiring/releasing resources is handled as an *effect*
 
 ---
@@ -855,7 +839,7 @@ In all the slides I always omitted the additional effect type parameter!
 - `Fs2Rabbit[F]`
 - `HttpRoutes[F]`
 
-#### Polymorphism is great, but comes at a cost!
+#### Polymorphism is great, but comes at a (learning) cost!
 
 ---
 
@@ -865,7 +849,7 @@ In all the slides I always omitted the additional effect type parameter!
 - only _3 main datatypes_: `IO`, `Resource`, `Stream`
 - no _variables_, no _mutable state_
 - no fancy abstractions
-- no unneeded polymorphism (e.g. tagless final)
+- no unneeded polymorphism
 - __I could have written almost the same code in Kotlin, Swift or.. Haskell!__
 
 ---

@@ -18,7 +18,7 @@ header-strong: #C44D58
 
 ## _@al333z_
 ### Software Engineer
-### Member of _FP in Bologna_ ![inline 10%](pics/fpinbo.jpg)
+### Member of _@FPinBO_ ![inline 10%](pics/fpinbo.jpg)
 ### Runner
 
 ![right](pics/pic.jpg)
@@ -208,7 +208,7 @@ val program: IO[Unit] =
  for {
     i1 <- ioInt
     _  <- IO.sleep(i.second)
-    _  <- IO.raiseError(new RuntimeException("boom!"))
+    _  <- IO.raiseError(new RuntimeException("boom!")) // not throwing!
     i2 <- ioInt // not executed, comps is short-circuted
  } yield ()
 ```
@@ -715,7 +715,7 @@ How to achieve _dependency inversion_?
 
 - **I don't like _suffering_**
 - JVM application lifecycle is not so complex
-- `IO`, `SafeApp`, `Resource`, `Stream` are handling properly termination events
+- `IO`, `IOApp`, `Resource`, `Stream` are handling properly termination events
 
 ---
 
