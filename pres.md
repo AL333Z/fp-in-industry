@@ -66,9 +66,11 @@ Why not.
 
 ---
 
+[.background-color: #FFFFFF]
+
 # Sample Architecture: _Order History Service_
 
-![Inline, 70%](pics/arch-white.png)
+![Inline, 70%](pics/arch.png)
 
 - Let's assume we are provided with domain events from an Order Management Platform (e.g. OrderCreated), via a RabbitMQ broker
 - We need to build an Order History Service
@@ -76,10 +78,11 @@ Why not.
 ^ Talk ONLY about REQUIREMENTS!
 
 ---
+[.background-color: #FFFFFF]
 
 # Order History Service: _components_
 
-![Inline, 70%](pics/arch-white.png)
+![Inline, 70%](pics/arch.png)
 
 - a component which projects a model, in a MongoDB collection
 - so that an HTTP service can queries the collection returning orders
@@ -117,13 +120,22 @@ We'll just put our attention on _implementing an architecture component_ (the pr
 ---
 # Let's start
 ---
+[.background-color: #FFFFFF]
 
 # Building a projector
 
-![Inline, 80%](pics/projector-white.png)
+![Inline, 80%](pics/projector.png)
 
 - __Consume__ a stream of events from a RabbitMQ queue
 - __Persist__ a model to a MongoDB collection
+
+---
+
+[.background-color: #FFFFFF]
+
+# How to fill the abstraction gap?
+
+![Inline](pics/gap.png)
 
 ---
 
@@ -269,6 +281,14 @@ Who's gonna **_run_** the suspended computation then?
 
 ---
 
+[.background-color: #FFFFFF]
+
+# How to fill the abstraction gap?
+
+![Inline](pics/io.png)
+
+---
+
 [.code-highlight: 1-2,8]
 [.code-highlight: all]
 
@@ -309,6 +329,14 @@ Using `fs2-rabbit` lib which:
 
 ---
 
+[.background-color: #FFFFFF]
+
+# How to fill the abstraction gap?
+
+![Inline](pics/lib.png)
+
+---
+
 # 2.1. Interact with a RabbitMQ broker
 ## Open a connection
 
@@ -331,6 +359,14 @@ val channel: Resource[AMQPChannel] = client.createConnectionChannel
 # Extremely helpful to write code that:
 - doesn't leak
 - handles properly terminal signals
+
+---
+
+[.background-color: #FFFFFF]
+
+# How to fill the abstraction gap?
+
+![Inline](pics/resource.png)
 
 ---
 
@@ -466,6 +502,14 @@ type Consumer =
 - Describes a *sequence* of effectful computation
 - **_Pull-based_**,  a consumer pulls its values by repeatedly performing one pull step at a time
 - **Simplify the way we write concurrent streaming consumers**
+
+---
+
+[.background-color: #FFFFFF]
+
+# How to fill the abstraction gap?
+
+![Inline](pics/stream.png)
 
 ---
 
