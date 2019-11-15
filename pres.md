@@ -179,7 +179,7 @@ A value of type `IO[A]` is a computation that, when evaluated, can perform __eff
 
 [.code-highlight: none]
 [.code-highlight: 1-8]
-[.code-highlight: 10-15]
+[.code-highlight: 9-15]
 [.code-highlight: all]
 
 # IO and combinators
@@ -219,7 +219,7 @@ val ioInt: IO[Int] = IO.delay{ println("hey!"); 1 }
 val program: IO[Unit] =
  for {
     i1 <- ioInt
-    _  <- IO.sleep(i.second)
+    _  <- IO.sleep(i1.second)
     _  <- IO.raiseError(new RuntimeException("boom!")) // not throwing!
     i2 <- ioInt // not executed, comps is short-circuted
  } yield ()
@@ -237,6 +237,7 @@ val program: IO[Unit] =
 
 [.code-highlight: 1-3, 15]
 [.code-highlight: 1, 5-7,13-15]
+[.code-highlight: 8-12]
 [.code-highlight: all]
 
 # 1. Read a bunch of configs from the env
@@ -244,14 +245,14 @@ val program: IO[Unit] =
 ```scala
 object Mongo {
   case class Auth(username: String, password: String)
-  case class Config(auth: Option[Auth], addresses: List[String], /*...*/)
+  case class Config(auth: Auth, addresses: List[String], /*...*/)
   
   object Config {
     // a delayed computation which read from env variables
     val load: IO[Config] =
       for {
-        user     <- Option.delay(System.getenv("MONGO_USERNAME"))
-        password <- Option.delay(System.getenv("MONGO_PASSWORD"))
+        user     <- IO.delay(System.getenv("MONGO_USERNAME"))
+        password <- IO.delay(System.getenv("MONGO_PASSWORD"))
         //...reading other env vars ... //
       } yield Config(Auth(user, password), endpoints, port, db, collection)
   }
@@ -767,6 +768,7 @@ How to achieve _dependency inversion_?
 ---
 
 [.code-highlight: 1]
+[.code-highlight: 1-5]
 [.code-highlight: 9-13]
 [.code-highlight: all]
 
@@ -881,7 +883,6 @@ In all the slides I always omitted the additional effect type parameter!
 - `Resource[F, A]`
 - `Stream[F, A]`
 - `Fs2Rabbit[F]`
-- `HttpRoutes[F]`
 
 #### Polymorphism is great, but comes at a (learning) cost!
 
