@@ -33,7 +33,7 @@ header-strong: #C44D58
 - FP is not suited __to deliver value to the business__
 
 ---
-
+<!--
 # Why Functional Programming?
 
 Why not.
@@ -48,15 +48,7 @@ Why not.
 - Let us build programs which are **_simpler to reason about_**
 
 ---
-
-# Why Developers are scared by Functional Programming?
-
-- the *learning curve* may be steep 
-- willingness to experience a _mental shift_
-- may not appear _familiar_ at first
-- I just don't know..
-
----
+-->
 
 # Agenda
 
@@ -156,16 +148,16 @@ We'll just put our attention on _implementing an architecture component_ (the pr
 
 # Introducing IO
 
-A data type for **encoding effects** as pure values, capable of expressing both computations such that:
-- can end in *either success or failure*
-- on evaluation *yield exactly one result*
-- may support *cancellation*
- 
 ---
 
 # Introducing IO
 
-A value of type `IO[A]` is a computation that, when evaluated, can perform __effects__ before returning a value of type `A`. 
+A data type for **encoding effects** as pure values, capable of expressing both computations such that:
+- can end in *either success or failure*
+- on evaluation *yield exactly one result*
+- may support *cancellation*
+
+A value of type `IO[A]` is a computation that, when evaluated, can perform __effects__ before returning a value of type `A`.
 
 ---
 
@@ -205,7 +197,6 @@ class IO[A] {
 
 # Composing sequential effects
 
-[.code-highlight: none]
 [.code-highlight: 1]
 [.code-highlight: 3-5]
 [.code-highlight: 3-6]
@@ -214,7 +205,7 @@ class IO[A] {
 [.code-highlight: all]
 
 ```scala
-val ioInt: IO[Int] = IO.delay{ println("hey!"); 1 }
+val ioInt: IO[Int] = IO.delay{ println("hello"); 1 }
 
 val program: IO[Unit] =
  for {
@@ -225,7 +216,8 @@ val program: IO[Unit] =
  } yield ()
 
 > Output:
-> hey
+> hello
+> <...1 second...>
 > RuntimeException: boom!
 ```
 
@@ -347,7 +339,7 @@ val client: Fs2Rabbit = Fs2Rabbit[IO](config)
 val channel: Resource[AMQPChannel] = client.createConnectionChannel
 ```
 
-### What's a `Resource`?
+## `Resource`?
 
 ---
 
@@ -450,7 +442,6 @@ Releasing outer
 
 # Gotchas:
 - _Nested resources_ are released in *reverse order* of acquisition 
-- Outer resources are released even if an inner use or release fails
 - Easy to _lift_ an `AutoClosable` to `Resource`, via `Resource.fromAutoclosable`
 - You can _lift_ any `IO[A]` into a `Resource[A]` with a no-op release via `Resource.liftF`
 
@@ -514,13 +505,27 @@ type Consumer =
 
 ---
 
+[.code-highlight: 1-6]
+[.code-highlight: 8-13]
+[.code-highlight: all]
+
 # Introducing Stream
 
 A stream _producing output_ of type `O` and which may _evaluate `IO` effects_.
 
 ```scala
+object Stream {
+  def emit[A](a: A): Stream[A]
+  def emits[A](as: List[A]): Stream[A]
+  def eval[A](f: IO[A]): Stream[A]
+  ...
+}
+
 class Stream[O]{
   def evalMap[O2](f: O => IO[O2]): Stream[O2]
+  ...
+  def map[O2](f: O => O2): Stream[O2]
+  def flatMap[O2](f: O => Stream[O2]): Stream[O2]
 }
 ```
 
@@ -530,6 +535,8 @@ class Stream[O]{
 
 # Introducing Stream
 
+A sequence of effects...
+
 ```scala
 Stream(1,2,3)
   .repeat
@@ -537,8 +544,6 @@ Stream(1,2,3)
   .compile
   .drain
 ```
-
-A sequence of effects...
 
 ---
 
@@ -591,9 +596,9 @@ Using the official `mongo-scala-driver`, which is *not* exposing purely function
 
 # How to turn an API to be _functional<sup>TM</sup>_?
 
-In this case:
-- **_wrap_** the impure type
-- only **expose** the _safe_ version of its operations
+In most cases:
+- **wrap** the _impure type_ so that its operations are no more reachable
+- only **expose** a _safer_ version of its operations
 
 ---
 
@@ -617,11 +622,12 @@ class Collection(
 
 ---
 
-[.code-highlight: 1,14]
-[.code-highlight: 3,13]
-[.code-highlight: 3-4,13]
-[.code-highlight: 3,6-7,13]
-[.code-highlight: 3,6-12,13]
+[.code-highlight: 1,12]
+[.code-highlight: 3,11]
+[.code-highlight: 3-4,11]
+[.code-highlight: 3-7,11]
+[.code-highlight: 3-9,11]
+[.code-highlight: 3-10,11]
 [.code-highlight: all]
 
 # 3.1 Open a connection
@@ -630,18 +636,17 @@ class Collection(
 object Mongo {
   ...
  def collectionFrom(conf: Config): Resource[Collection] = {
-  val clientSettings = ??? // conf to mongo-scala-driver settings
-  
-  Resource
-   .fromAutoCloseable(IO.defer(MongoClient(clientSettings)))
-   .map { client => 
-           val unsafeCol = client.getDatabase(conf.databaseName)
-                                 .getCollection(conf.collectionName)
-           new Collection(unsafeCol)
-   }
- }
+    val clientSettings = ??? // conf to mongo-scala-driver settings
+
+    for {
+      client    <- Resource.fromAutoCloseable(IO.defer(MongoClient(clientSettings)))
+      unsafeCol =  client.getDatabase(conf.databaseName)
+                         .getCollection(conf.collectionName)
+    } yield new Collection(unsafeCol)
+  }
 }
 ```
+
 ---
 
 # Projector application
@@ -725,7 +730,7 @@ class OrderHistoryProjector(eventRepo: EventRepository,
 
 # Wiring
 
-How to achieve _dependency inversion_?
+How to achieve _separation of concerns_?
 
 ---
 
@@ -759,9 +764,9 @@ How to achieve _dependency inversion_?
 # Constructor Injection
 
 ### a companion object 
-  1. with a _`fromXXX`_ method (**smart constructor**) taking its config (or other useful params) as input
-  2.  usually acquiring resources 
-  3.  and returning the component as a _resource_ itself
+  1. with a _`fromX`_ method (**smart constructor**) taking deps as input
+  2. usually performing effects and/or acquiring resources
+  3. thus returning `IO`/`Resource` of the component
  
 [.footer: My view of Constructor Injection for effectful applications]
 
@@ -801,12 +806,10 @@ object OrderHistoryProjector {
     rabbitConfig: Fs2RabbitConfig
   ): Resource[OrderHistoryProjector] =
     for {
-      collection        <- Mongo.collectionFrom(mongoConfig)
       logger            <- Resource.liftF(Slf4jLogger.create)
-      (acker, consumer) <- Rabbit.consumerFrom(
-                            rabbitConfig,
-                            eventDecoder)
-      repo = EventRepository.fromCollection(collection)
+      (acker, consumer) <- Rabbit.consumerFrom(rabbitConfig, eventDecoder)
+      collection        <- Mongo.collectionFrom(mongoConfig)
+      repo               = EventRepository.fromCollection(collection)
     } yield new OrderHistoryProjector(repo, consumer, acker, logger)
 }
 ```
@@ -899,13 +902,13 @@ In all the slides I always omitted the additional effect type parameter!
 
 ---
 
-# Thanks
-
----
-
 # References
 
 https://github.com/AL333Z/fp-in-industry
 https://typelevel.org/cats-effect/
 https://fs2.io/
 https://fs2-rabbit.profunktor.dev/
+
+---
+
+# Thanks
