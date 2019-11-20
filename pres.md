@@ -878,7 +878,7 @@ object OrderHistoryProjectorApp extends IOApp {
 ---
 
 # I've been lying to you
-#### _Stream, Resource, Fs2Rabbit and HttpRoutes are polymorphic in the effect type!_
+#### _Stream, Resource and Fs2Rabbit are polymorphic in the effect type!_
 
 In all the slides I always omitted the additional effect type parameter!
 
