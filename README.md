@@ -10,10 +10,10 @@ You will then discover how there's no need to be a mathematician in order to be 
 
 - To bring up mongo and rabbit: `docker compose up`
 - Export these env var
-   MONGO_USERNAME=root
-   MONGO_PASSWORD=example
-   RABBIT_USERNAME=guest
-   RABBIT_PASSWORD=guest
+   - MONGO_USERNAME=root
+   - MONGO_PASSWORD=example
+   - RABBIT_USERNAME=guest
+   - RABBIT_PASSWORD=guest
 - run both applications: `sbt runMain api.OrderHistoryApp` and `sbt runMain projector.OrderHistoryProjectorApp`
 - now you can push any message to the [queue](http://localhost:15672/#/queues/%2F/EventsFromOms), e.g.
 ```json
