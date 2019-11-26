@@ -7,7 +7,7 @@ text-strong: #C7F464
 header-emphasis: #C44D58
 header-strong: #C44D58
 
-## (Im)pratical Functional Programming
+## (Im)practical Functional Programming
 
 ### _Adopting Functional Programming_
 ### _In industry_
