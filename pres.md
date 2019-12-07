@@ -9,8 +9,7 @@ header-strong: #C44D58
 
 ## (Im)practical Functional Programming
 
-### _Adopting Functional Programming_
-### _In industry_
+### _Adopting FP In industry_
 
 ---
 
@@ -33,28 +32,12 @@ header-strong: #C44D58
 - FP is not suited __to deliver value to the business__
 
 ---
-<!--
-# Why Functional Programming?
-
-Why not.
-
----
-
-# Why Functional Programming?
-
-- Built on __solid foundations__, but there's no need to be a mathematician to be a functional programmer!
-- Offers __abstractions and techniques__ to solve concrete problems
-- Improves code reuse, through __composition__
-- Let us build programs which are **_simpler to reason about_**
-
----
--->
 
 # Agenda
 
 - A sample architecture
+- Introduce a bunch of building blocks
 - Design architecture components
-- Have some fun in the meanwhile?
 
 ---
 
@@ -106,7 +89,6 @@ We'll just put our attention on _implementing an architecture component_ (the pr
 - immutability, _ADTs_
 - higher-kinded types + implicits -> *typeclasses*
 - DSL-friendly
-- discourages runtime checks (reflections, etc..)
 - __mature ecosystem__ of FP libs (cats, cats-effects, fs2, circe, http4s, etc..)
 
 ---
@@ -147,17 +129,15 @@ We'll just put our attention on _implementing an architecture component_ (the pr
 ---
 
 # Introducing IO
+#### A data type for **encoding effects** as pure values
 
 ---
 
 # Introducing IO
 
-A data type for **encoding effects** as pure values, capable of expressing both computations such that:
-- can end in *either success or failure*
-- on evaluation *yield exactly one result*
-- may support *cancellation*
-
-A value of type `IO[A]` is a computation that, when evaluated, can perform __effects__ before returning a value of type `A`.
+A value of type `IO[A]` is a computation that, when evaluated, can perform __effects__ before either
+- yielding exactly one _result_ a value of type `A`
+- raising a _failure_
 
 ---
 
@@ -223,7 +203,7 @@ val program: IO[Unit] =
 
 ---
 
-# Putting things in practice!
+# We are practical
 
 ---
 
@@ -287,7 +267,8 @@ Who's gonna **_run_** the suspended computation then?
 
 # *End of the world*
 
-`IOApp` is a safe application type that describes a main which executes an `IO`, as the single _entry point_ to a **pure** program.
+- `IOApp` describes a _main_ which executes an `IO`
+- as the single _entry point_ to a **pure** program.
 
 ```scala
 object OrderHistoryProjectorApp extends IOApp {
@@ -334,7 +315,7 @@ Using `fs2-rabbit` lib which:
 ## Open a connection
 
 ```scala 
-val client: Fs2Rabbit = Fs2Rabbit[IO](config)
+val client: Fs2Rabbit = Fs2Rabbit(config)
 
 val channel: Resource[AMQPChannel] = client.createConnectionChannel
 ```
@@ -447,6 +428,10 @@ Releasing outer
 
 ---
 
+# We are pragmatic
+
+---
+
 [.code-highlight: 4]
 [.code-highlight: 6-10]
 [.code-highlight: 5-12]
@@ -486,14 +471,14 @@ type Consumer =
 ---
 
 # Introducing Stream
+#### A *sequence* of effectful computation
 
 ---
 
 # Introducing Stream
 
-- Describes a *sequence* of effectful computation
-- **_Pull-based_**,  a consumer pulls its values by repeatedly performing one pull step at a time
 - **Simplify the way we write concurrent streaming consumers**
+- **_Pull-based_**, a consumer pulls its values by repeatedly performing pull steps
 
 ---
 
@@ -544,6 +529,10 @@ Stream(1,2,3)
   .compile
   .drain
 ```
+
+---
+
+# We deliver
 
 ---
 
@@ -660,29 +649,24 @@ object Mongo {
 
 ---
 
-[.code-highlight: 1-3]
-[.code-highlight: 5-6,16-17]
+[.code-highlight: 1, 11]
+[.code-highlight: 2]
+[.code-highlight: 3-10]
 [.code-highlight: all]
 
 # 3.2 Store the model to the given collection
 
 ```scala 
-trait EventRepository {
-  def store(event: OrderCreatedEvent): IO[Unit]
-}
-
-object EventRepository {
- def fromCollection(collection: Collection): EventRepository = new EventRepository {
-   def store(event: OrderCreatedEvent): IO[Unit] =
-     collection.insertOne( // using safe ops
-       Document(
-         "id"      -> event.id,
-         "company" -> event.company,
-         "email"   -> event.email,
-         "lines" -> event.lines.map(line => ...)
-       )
-     )
-  }
+class EventRepository(collection: Collection) {
+  def store(event: OrderCreatedEvent): IO[Unit] =
+    collection.insertOne( // using safe ops
+      Document(
+        "id"      -> event.id,
+        "company" -> event.company,
+        "email"   -> event.email,
+        "lines" -> event.lines.map(line => ...)
+      )
+    )
 }
 ```
 
@@ -736,37 +720,24 @@ How to achieve _separation of concerns_?
 
 # Wiring
 
-- *`Reader`*/*`Kleisli`*?
-- *Cake pattern*?
-- *Dagger* et similia?
-- Your favourite *DI framework* with xmls and reflection?
-
----
-
-# Wiring
-
 ## **_Constructor Injection_**!
 
-- **I don't like _suffering_**
 - JVM application lifecycle is not so complex
 - `IO`, `IOApp`, `Resource`, `Stream` are handling properly termination events
 
 ---
 
-# Constructor Injection
-
-### a class with a **private constructor** taking its dependencies as input
-
-[.footer: My view of Constructor Injection for effectful applications]
+## Introducing Constructor Injection
+#### How __not to suffer__ while injecting dependencies
 
 ---
 
 # Constructor Injection
 
-### a companion object 
-  1. with a _`fromX`_ method (**smart constructor**) taking deps as input
-  2. usually performing effects and/or acquiring resources
-  3. thus returning `IO`/`Resource` of the component
+- a class with a **private constructor**
+- a companion object with a _`fromX/make`_ method (**smart constructor**)
+  1. taking deps as input
+  2. usually returning `IO`/`Resource` of the component class
  
 [.footer: My view of Constructor Injection for effectful applications]
 
@@ -816,24 +787,23 @@ object OrderHistoryProjector {
 
 ---
 
-# Wiring - Constructor Injection
+# Constructor Injection
 
-- **No magic at all**, each dependency is explicitly passed in the *smart constructor* of each component
+- **No magic**, each dependency is explicitly injected
 - Acquiring/releasing resources is handled as an *effect*
 
 ---
 
-[.code-highlight: 9-11]
+[.code-highlight: 8-10]
 [.code-highlight: all]
 
-# Projector Application: Main
+# Main
 
 ```scala
 object OrderHistoryProjectorApp extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      // resolve configs from the environment
       mongoConfig  <- Mongo.Config.load
       rabbitConfig <- Rabbit.Config.load
 
@@ -853,51 +823,12 @@ object OrderHistoryProjectorApp extends IOApp {
 
 ---
 
-# Things I'm not telling you
-
----
-
-# Things I'm not telling you
-## _Testing_
-
----
-
-# Things I'm not telling you
-## _Typeclasses_
-
----
-
-# Things I'm not telling you
-## _Higher Kinded Types_
-
----
-
-# Things I'm not telling you
-## _Tagless final_
-
----
-
-# I've been lying to you
-#### _Stream, Resource and Fs2Rabbit are polymorphic in the effect type!_
-
-In all the slides I always omitted the additional effect type parameter!
-
-
-- `Resource[F, A]`
-- `Stream[F, A]`
-- `Fs2Rabbit[F]`
-
-#### Polymorphism is great, but comes at a (learning) cost!
-
----
-
 # Conclusions
 
 - a production-ready component in under 300 LOC
 - only _3 main datatypes_: `IO`, `Resource`, `Stream`
 - no _variables_, no _mutable state_
-- no fancy abstractions
-- no unneeded polymorphism
+- no ivory tower
 - __I could have written almost the same code in Kotlin, Swift or.. Haskell!__
 
 ---
@@ -912,3 +843,17 @@ https://fs2-rabbit.profunktor.dev/
 ---
 
 # Thanks
+
+---
+
+# I've been lying to you
+#### _Stream, Resource and Fs2Rabbit are polymorphic in the effect type!_
+
+In all the slides I always omitted the additional effect type parameter!
+
+
+- `Resource[F, A]`
+- `Stream[F, A]`
+- `Fs2Rabbit[F]`
+
+#### Polymorphism is great, but comes at a (learning) cost!
