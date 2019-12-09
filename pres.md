@@ -624,7 +624,7 @@ class Collection(
 ```scala
 object Mongo {
   ...
- def collectionFrom(conf: Config): Resource[Collection] = {
+  def collectionFrom(conf: Config): Resource[Collection] = {
     val clientSettings = ??? // conf to mongo-scala-driver settings
 
     for {
