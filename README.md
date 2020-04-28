@@ -1,3 +1,7 @@
+# Video
+
+[![12/2019 - FPinBO at LuogoComune (BO)](https://img.youtube.com/vi/x-3HqshXLps/maxresdefault.jpg)](https://youtu.be/x-3HqshXLps)
+
 # Abstract
 
 The Functional Programming paradigm has largely been emphasized in academia rather than commercial or industrial settings.
