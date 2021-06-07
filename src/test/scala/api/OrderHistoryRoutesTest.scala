@@ -1,15 +1,16 @@
 package api
 
 import cats.effect._
+import cats.effect.unsafe.implicits.global
 import data.params.{ Company, Email, OrderNo, PagingCriteria }
 import data.{ ItemId, Order, OrderLine, Price }
 import io.circe.Json
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.implicits._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class OrderHistoryRoutesTest extends FunSuite {
+class OrderHistoryRoutesTest extends AnyFunSuite {
 
   test("get orders") {
 
@@ -62,10 +63,10 @@ class OrderHistoryRoutesTest extends FunSuite {
   def check[A](actual: IO[Response[IO]], expectedStatus: Status, expectedBody: Option[A])(
     implicit ev: EntityDecoder[IO, A]
   ): Boolean = {
-    val actualResp  = actual.unsafeRunSync
+    val actualResp  = actual.unsafeRunSync()
     val statusCheck = actualResp.status == expectedStatus
-    val bodyCheck = expectedBody.fold[Boolean](actualResp.body.compile.toVector.unsafeRunSync.isEmpty)(
-      expected => actualResp.as[A].unsafeRunSync === expected
+    val bodyCheck = expectedBody.fold[Boolean](actualResp.body.compile.toVector.unsafeRunSync().isEmpty)(
+      expected => actualResp.as[A].unsafeRunSync() === expected
     )
     statusCheck && bodyCheck
   }

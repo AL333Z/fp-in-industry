@@ -424,7 +424,7 @@ Releasing outer
 # Gotchas:
 - _Nested resources_ are released in *reverse order* of acquisition 
 - Easy to _lift_ an `AutoClosable` to `Resource`, via `Resource.fromAutoclosable`
-- You can _lift_ any `IO[A]` into a `Resource[A]` with a no-op release via `Resource.liftF`
+- You can _lift_ any `IO[A]` into a `Resource[A]` with a no-op release via `Resource.eval`
 
 ---
 
@@ -445,7 +445,7 @@ val client: Fs2Rabbit = Fs2Rabbit(config)
 
 val rabbitDeps: Resource[(Acker, Consumer)] = for {
   channel <- client.createConnectionChannel // resource opening a connection to a channel
-  (acker, consumer) <- Resource.liftF( // lift an IO which creates the consumer
+  (acker, consumer) <- Resource.eval( // lift an IO which creates the consumer
     client.createAckerConsumer[Try[OrderCreatedEvent]](
       queueName = QueueName("EventsFromOms"),
       basicQos = BasicQos(0, 10))(
@@ -777,7 +777,7 @@ object OrderHistoryProjector {
     rabbitConfig: Fs2RabbitConfig
   ): Resource[OrderHistoryProjector] =
     for {
-      logger            <- Resource.liftF(Slf4jLogger.create)
+      logger            <- Resource.eval(Slf4jLogger.create)
       (acker, consumer) <- Rabbit.consumerFrom(rabbitConfig, eventDecoder)
       collection        <- Mongo.collectionFrom(mongoConfig)
       repo               = EventRepository.fromCollection(collection)

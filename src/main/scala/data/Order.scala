@@ -6,7 +6,7 @@ import io.circe.generic.semiauto._
 import io.circe.{ Encoder, Json }
 import org.mongodb.scala.bson.collection.immutable.Document
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 case class Order(

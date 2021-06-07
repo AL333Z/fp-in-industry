@@ -1,9 +1,9 @@
 package data.params
 
 import org.http4s.QueryParamDecoder._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class MatchersTest extends FunSuite {
+class MatchersTest extends AnyFunSuite {
 
   test("extract optional with default") {
     val optWithDefaultQueryParam: OptionalWithDefaultQueryParamsDecoderMatcher[String] =

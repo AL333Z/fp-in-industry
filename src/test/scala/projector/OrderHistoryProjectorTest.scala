@@ -1,16 +1,16 @@
 package projector
 
-import cats.effect.IO
-import cats.effect.concurrent.Ref
+import cats.effect.unsafe.implicits.global
+import cats.effect.{ IO, Ref }
 import dev.profunktor.fs2rabbit.model._
 import fs2.Stream
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
+import org.typelevel.log4cats.slf4j.Slf4jLogger._
 import projector.event.{ OrderCreatedEvent, OrderLine }
 
 import scala.util.{ Success, Try }
 
-class OrderHistoryProjectorTest extends FunSuite {
+class OrderHistoryProjectorTest extends AnyFunSuite {
   test("store events") {
 
     val input       = OrderCreatedEvent("001", "ACME", "test@test.com", List(OrderLine(1, "item1", BigDecimal(10))))
@@ -58,8 +58,9 @@ class OrderHistoryProjectorTest extends FunSuite {
   class AckerMock private (invocations: Ref[IO, List[DeliveryTag]]) {
 
     val acker: AckResult => IO[Unit] = {
-      case AckResult.Ack(dt)  => invocations.update(_ :+ dt)
-      case AckResult.NAck(dt) => invocations.update(_ :+ dt)
+      case AckResult.Ack(dt)    => invocations.update(_ :+ dt)
+      case AckResult.NAck(dt)   => invocations.update(_ :+ dt)
+      case AckResult.Reject(dt) => invocations.update(_ :+ dt)
     }
 
     def verifyInvocationFor(deliveryTag: DeliveryTag): IO[Boolean] = invocations.get.map(_.contains(deliveryTag))

@@ -1,20 +1,12 @@
 package mongo
 
-import java.util.concurrent.TimeUnit
-
-import cats.effect.{ ConcurrentEffect, IO, Resource }
+import cats.effect.{ IO, Resource }
 import cats.implicits._
 import org.mongodb.scala.connection.{ ClusterSettings, SocketSettings }
-import org.mongodb.scala.{
-  MongoClient,
-  MongoClientSettings,
-  MongoCredential,
-  Observer,
-  ServerAddress,
-  SingleObservable
-}
+import org.mongodb.scala.{ MongoClient, MongoClientSettings, MongoCredential, ServerAddress }
 
-import scala.collection.JavaConverters._
+import java.util.concurrent.TimeUnit
+import scala.jdk.CollectionConverters.SeqHasAsJava
 import scala.util.Try
 
 object Mongo {
@@ -44,16 +36,21 @@ object Mongo {
     }
   }
 
-  def collectionFrom(conf: Config)(implicit ce: ConcurrentEffect[IO]): Resource[IO, Collection] = {
+  def collectionFrom(conf: Config): Resource[IO, Collection] = {
 
     val addresses: List[ServerAddress] = conf.serverAddresses.map(new ServerAddress(_, conf.serverPort))
     val maybeCredential: Option[MongoCredential] = conf.auth.map(
       conf => MongoCredential.createScramSha1Credential(conf.username, "admin", conf.password.toCharArray)
     )
 
-    val settings = MongoClientSettings.builder
-      .applyToClusterSettings((t: ClusterSettings.Builder) => t.hosts(addresses.asJava))
-      .applyToSocketSettings((t: SocketSettings.Builder) => t.readTimeout(30, TimeUnit.SECONDS))
+    val settings = MongoClientSettings
+      .builder()
+      .applyToClusterSettings { (t: ClusterSettings.Builder) =>
+        t.hosts(addresses.asJava); ()
+      }
+      .applyToSocketSettings { (t: SocketSettings.Builder) =>
+        t.readTimeout(30, TimeUnit.SECONDS); ()
+      }
 
     Resource
       .fromAutoCloseable(
@@ -66,19 +63,5 @@ object Mongo {
       )
       .map(_.getDatabase(conf.databaseName).getCollection(conf.collectionName))
       .map(Collection(_))
-  }
-
-  implicit class SingleObservableToIO[A](val inner: SingleObservable[A]) extends AnyVal {
-
-    def toIO: IO[A] =
-      IO.async(
-        k =>
-          inner
-            .subscribe(new Observer[A] {
-              override def onNext(result: A): Unit     = k(result.asRight[Throwable])
-              override def onError(e: Throwable): Unit = k(e.asLeft)
-              override def onComplete(): Unit          = ()
-            })
-      )
   }
 }

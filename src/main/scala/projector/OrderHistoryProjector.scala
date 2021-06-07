@@ -1,12 +1,11 @@
 package projector
 
-import cats.effect.{ ConcurrentEffect, IO, Resource }
-import cats.implicits._
+import cats.effect.{ IO, Resource }
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
 import dev.profunktor.fs2rabbit.model.{ AckResult, AmqpEnvelope }
 import fs2.Stream
-import io.chrisdavenport.log4cats.Logger
-import io.chrisdavenport.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import mongo.Mongo
 import projector.OrderHistoryProjector.{ Acker, Consumer }
 import projector.event.OrderCreatedEvent
@@ -43,10 +42,10 @@ object OrderHistoryProjector {
   def fromConfigs(
     mongoConfig: Mongo.Config,
     rabbitConfig: Fs2RabbitConfig
-  )(implicit ce: ConcurrentEffect[IO]): Resource[IO, OrderHistoryProjector] =
+  ): Resource[IO, OrderHistoryProjector] =
     for {
       collection <- Mongo.collectionFrom(mongoConfig)
-      logger     <- Resource.liftF(Slf4jLogger.create[IO])
+      logger     <- Resource.eval(Slf4jLogger.create[IO])
       (acker, consumer) <- Rabbit.consumerFrom(
                             rabbitConfig,
                             OrderCreatedEvent.orderCreatedEventEnvelopeDecoder

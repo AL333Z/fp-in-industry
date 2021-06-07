@@ -4,7 +4,9 @@ organization := "com.al333z"
 
 scalaVersion := "2.13.6"
 
-val Http4sVersion = "0.21.24"
+addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+
+val Http4sVersion = "1.0.0-M23"
 libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-blaze-server" % Http4sVersion,
   "org.http4s" %% "http4s-dsl"          % Http4sVersion,
@@ -12,8 +14,7 @@ libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-blaze-client" % Http4sVersion % Test
 )
 
-libraryDependencies += "dev.profunktor" %% "fs2-rabbit"           % "2.1.0"
-libraryDependencies += "co.fs2"         %% "fs2-reactive-streams" % "2.0.0"
+libraryDependencies += "dev.profunktor" %% "fs2-rabbit" % "4.0.0"
 
 libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"
 
@@ -25,7 +26,7 @@ libraryDependencies += "io.circe" %% "circe-parser"  % CirceVersion
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 libraryDependencies += "org.typelevel"  %% "log4cats-slf4j" % "2.1.1"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.8" % Test
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.9" % Test
 
 addCommandAlias("buildFmt", "all compile sbt:scalafmt scalafmt test:scalafmt")
 addCommandAlias("fmt", "all sbt:scalafmt scalafmt test:scalafmt")

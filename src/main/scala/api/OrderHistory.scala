@@ -1,16 +1,16 @@
 package api
 
-import cats.effect.{ ContextShift, IO, Resource, Timer }
+import cats.effect.{ IO, Resource }
 import mongo.Mongo
 import org.http4s.HttpRoutes
+import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.implicits._
-import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
 
-class OrderHistory private (routes: HttpRoutes[IO])(implicit ce: ContextShift[IO], ti: Timer[IO]) {
+class OrderHistory private (routes: HttpRoutes[IO]) {
 
   val serve: IO[Unit] =
-    BlazeServerBuilder[IO]
+    BlazeServerBuilder[IO](scala.concurrent.ExecutionContext.global)
       .bindHttp(80, "0.0.0.0")
       .withHttpApp(Logger.httpApp[IO](logHeaders = true, logBody = true)(routes.orNotFound))
       .serve
@@ -20,7 +20,7 @@ class OrderHistory private (routes: HttpRoutes[IO])(implicit ce: ContextShift[IO
 
 object OrderHistory {
 
-  def fromConfig(mongoConfig: Mongo.Config)(implicit ce: ContextShift[IO], ti: Timer[IO]): Resource[IO, OrderHistory] =
+  def fromConfig(mongoConfig: Mongo.Config): Resource[IO, OrderHistory] =
     Mongo
       .collectionFrom(mongoConfig)
       .map { collection =>
