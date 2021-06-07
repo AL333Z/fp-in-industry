@@ -2,7 +2,7 @@ name := "fp-in-industry"
 
 organization := "com.al333z"
 
-scalaVersion := "2.12.9"
+scalaVersion := "2.13.6"
 
 scalacOptions ++= Seq(
   "-deprecation", // Emit warning and location for usages of deprecated APIs.
@@ -52,9 +52,7 @@ scalacOptions ++= Seq(
   "-Ywarn-unused:privates" // Warn if a private member is unused.
 )
 
-addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")
-
-val Http4sVersion = "0.20.6"
+val Http4sVersion = "0.21.24"
 libraryDependencies ++= Seq(
   "org.http4s" %% "http4s-blaze-server" % Http4sVersion,
   "org.http4s" %% "http4s-dsl"          % Http4sVersion,
