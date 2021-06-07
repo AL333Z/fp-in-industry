@@ -67,7 +67,7 @@ libraryDependencies += "co.fs2"         %% "fs2-reactive-streams" % "2.0.0"
 
 libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"
 
-val CirceVersion = "0.11.1"
+val CirceVersion = "0.14.1"
 libraryDependencies += "io.circe" %% "circe-core"    % CirceVersion
 libraryDependencies += "io.circe" %% "circe-generic" % CirceVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % CirceVersion
