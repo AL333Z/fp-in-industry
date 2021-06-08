@@ -1,13 +1,10 @@
 package data
 
 import cats.implicits._
-import data.params.{ Company, Email, OrderNo }
 import io.circe.generic.semiauto._
-import io.circe.{ Encoder, Json }
-import org.mongodb.scala.bson.collection.immutable.Document
-
-import scala.jdk.CollectionConverters._
-import scala.util.Try
+import io.circe.{ Codec, Decoder, Encoder }
+import org.http4s.dsl.impl.QueryParamDecoderMatcher
+import org.http4s.{ ParseFailure, QueryParamDecoder, QueryParameterValue }
 
 case class Order(
   orderNo: OrderNo,
@@ -16,54 +13,101 @@ case class Order(
   lines: List[OrderLine]
 )
 
+case class OrderNo(value: String) extends AnyVal
+
+object OrderNo {
+  implicit val orderNoCodec: Codec[OrderNo] =
+    Codec.from(
+      decodeA = Decoder.decodeString.map(OrderNo(_)),
+      encodeA = Encoder.encodeString.contramap(_.value)
+    )
+
+  object OrderNoVar {
+    def unapply(arg: String): Option[OrderNo] = Some(OrderNo(arg))
+  }
+
+}
+
+case class Email(value: String) extends AnyVal
+
+object Email {
+
+  implicit val emailCodec: Codec[Email] =
+    Codec.from(
+      decodeA = Decoder.decodeString.map(Email(_)),
+      encodeA = Encoder.encodeString.contramap(_.value)
+    )
+
+  // incomplete/wrong..
+  private def validate(x: String): Option[String] =
+    """(\w+)@([\w\.]+)""".r.findFirstIn(x)
+
+  implicit val emailQueryParamDecoder: QueryParamDecoder[Email] = (value: QueryParameterValue) => {
+    validate(value.value)
+      .map(Email(_))
+      .toValidNel(ParseFailure("Invalid Email", value.value))
+  }
+  object EmailQueryParam extends QueryParamDecoderMatcher[Email]("email")(emailQueryParamDecoder)
+
+}
+
+case class Company(value: String) extends AnyVal
+
+object Company {
+  implicit val companyCodec: Codec[Company] =
+    Codec.from(
+      decodeA = Decoder.decodeString.map(Company(_)),
+      encodeA = Encoder.encodeString.contramap(_.value)
+    )
+
+  object CompanyVar {
+    def unapply(arg: String): Option[Company] = Some(Company(arg))
+  }
+
+}
+
 case class OrderLine(
-  lineNo: Int,
+  lineNo: LineNo,
   itemId: ItemId,
   price: Price
 )
 
-case class ItemId(value: String)
+case class LineNo(value: Int) extends AnyVal
 
-case class Price(value: BigDecimal)
+case class ItemId(value: String) extends AnyVal
+
+case class Price(value: BigDecimal) extends AnyVal
 
 object Order {
-  implicit val orderEncoder: Encoder[Order] = deriveEncoder[Order]
-
-  def fromBson(doc: Document): Try[Order] =
-    for {
-      lineDocs <- Try(doc("lines").asArray().asScala.toList.map(x => Document(x.asDocument())))
-      lines    <- lineDocs.traverse[Try, OrderLine](OrderLine.fromBson)
-      order <- Try(
-                Order(
-                  OrderNo(doc.getString("id")),
-                  Company(doc.getString("company")),
-                  Email(doc.getString("email")),
-                  lines
-                )
-              )
-    } yield order
+  implicit val orderCodec: Codec[Order] =
+    deriveCodec[Order]
 }
 
 object OrderLine {
-  implicit val orderLineEncoder: Encoder[OrderLine] = deriveEncoder[OrderLine]
+  implicit val orderLineCodec: Codec[OrderLine] =
+    deriveCodec[OrderLine]
+}
 
-  def fromBson(doc: Document): Try[OrderLine] = Try {
-    OrderLine(
-      doc.getInteger("no"),
-      ItemId(doc.getString("item")),
-      Price(doc("price").asDecimal128().getValue.bigDecimalValue())
+object LineNo {
+  implicit val lineNoCodec: Codec[LineNo] =
+    Codec.from(
+      decodeA = Decoder.decodeInt.map(LineNo(_)),
+      encodeA = Encoder.encodeInt.contramap(_.value)
     )
-  }
 }
 
 object ItemId {
-  implicit val itemIdEncoder: Encoder[ItemId] = Encoder.instance { x =>
-    Json.fromString(x.value)
-  }
+  implicit val itemIdCodec: Codec[ItemId] =
+    Codec.from(
+      decodeA = Decoder.decodeString.map(ItemId(_)),
+      encodeA = Encoder.encodeString.contramap(_.value)
+    )
 }
 
 object Price {
-  implicit val priceEncoder: Encoder[Price] = Encoder.instance { x =>
-    Json.fromBigDecimal(x.value)
-  }
+  implicit val priceCodec: Codec[Price] =
+    Codec.from(
+      decodeA = Decoder.decodeBigDecimal.map(Price(_)),
+      encodeA = Encoder.encodeBigDecimal.contramap(_.value)
+    )
 }

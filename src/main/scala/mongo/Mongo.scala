@@ -2,8 +2,12 @@ package mongo
 
 import cats.effect.{ IO, Resource }
 import cats.implicits._
-import org.mongodb.scala.connection.{ ClusterSettings, SocketSettings }
-import org.mongodb.scala.{ MongoClient, MongoClientSettings, MongoCredential, ServerAddress }
+import com.mongodb.connection.{ ClusterSettings, SocketSettings }
+import com.mongodb.{ MongoClientSettings, MongoCredential, ServerAddress }
+import data.Order
+import mongo4cats.circe._
+import mongo4cats.client.MongoClientF
+import mongo4cats.database.MongoCollectionF
 
 import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters.SeqHasAsJava
@@ -36,7 +40,7 @@ object Mongo {
     }
   }
 
-  def collectionFrom(conf: Config): Resource[IO, Collection] = {
+  def collectionFrom(conf: Config): Resource[IO, MongoCollectionF[Order]] = {
 
     val addresses: List[ServerAddress] = conf.serverAddresses.map(new ServerAddress(_, conf.serverPort))
     val maybeCredential: Option[MongoCredential] = conf.auth.map(
@@ -52,16 +56,15 @@ object Mongo {
         t.readTimeout(30, TimeUnit.SECONDS); ()
       }
 
-    Resource
-      .fromAutoCloseable(
-        IO {
-          maybeCredential match {
-            case Some(credentials) => MongoClient(settings.credential(credentials).build())
-            case None              => MongoClient(settings.build())
-          }
-        }
-      )
-      .map(_.getDatabase(conf.databaseName).getCollection(conf.collectionName))
-      .map(Collection(_))
+    val clientRes = maybeCredential match {
+      case Some(credentials) => MongoClientF.create[IO](settings.credential(credentials).build())
+      case None              => MongoClientF.create[IO](settings.build())
+    }
+
+    for {
+      client     <- clientRes
+      db         <- Resource.eval(client.getDatabase(conf.databaseName))
+      collection <- Resource.eval(db.getCollectionWithCirceCodecs[Order](conf.collectionName))
+    } yield collection
   }
 }

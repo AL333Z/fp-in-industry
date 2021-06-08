@@ -1,8 +1,8 @@
 package projector
 
 import cats.effect.IO
-import mongo.Collection
-import org.mongodb.scala.bson.collection.immutable.Document
+import data._
+import mongo4cats.database.MongoCollectionF
 import projector.event.OrderCreatedEvent
 
 trait EventRepository {
@@ -11,23 +11,25 @@ trait EventRepository {
 
 object EventRepository {
 
-  def fromCollection(collection: Collection): EventRepository =
+  def fromCollection(collection: MongoCollectionF[Order]): EventRepository =
     new EventRepository {
       override def store(event: OrderCreatedEvent): IO[Unit] =
-        collection.insertOne(
-          Document(
-            "id"      -> event.id,
-            "company" -> event.company,
-            "email"   -> event.email,
-            "lines" -> event.lines.map(
-              line =>
-                Document(
-                  "no"    -> line.no,
-                  "item"  -> line.item,
-                  "price" -> line.price
+        collection
+          .insertOne[IO](
+            Order(
+              orderNo = OrderNo(event.id),
+              company = Company(event.company),
+              email = Email(event.email),
+              lines = event.lines.map(
+                line =>
+                  OrderLine(
+                    lineNo = LineNo(line.no),
+                    itemId = ItemId(line.item),
+                    price = Price(line.price)
+                )
               )
             )
           )
-        )
+          .void
     }
 }

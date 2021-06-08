@@ -16,7 +16,9 @@ libraryDependencies ++= Seq(
 
 libraryDependencies += "dev.profunktor" %% "fs2-rabbit" % "4.0.0"
 
-libraryDependencies += "org.mongodb.scala" %% "mongo-scala-driver" % "2.7.0"
+val mongo4catsV = "0.2.8"
+libraryDependencies += "io.github.kirill5k" %% "mongo4cats-core"  % mongo4catsV
+libraryDependencies += "io.github.kirill5k" %% "mongo4cats-circe" % mongo4catsV
 
 val CirceVersion = "0.14.1"
 libraryDependencies += "io.circe" %% "circe-core"    % CirceVersion

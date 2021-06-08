@@ -2,8 +2,8 @@ package api
 
 import cats.effect._
 import cats.effect.unsafe.implicits.global
-import data.params.{ Company, Email, OrderNo, PagingCriteria }
-import data.{ ItemId, Order, OrderLine, Price }
+import data.params.PagingCriteria
+import data._
 import io.circe.Json
 import org.http4s._
 import org.http4s.circe._
@@ -21,7 +21,7 @@ class OrderHistoryRoutesTest extends AnyFunSuite {
         email = Email("test@mail.com"),
         lines = List(
           OrderLine(
-            lineNo = 1,
+            lineNo = LineNo(1),
             itemId = ItemId("AAA"),
             price = Price(BigDecimal(10.00))
           )
@@ -32,7 +32,7 @@ class OrderHistoryRoutesTest extends AnyFunSuite {
       override def findBy(email: Email, company: Company, pagingCriteria: PagingCriteria): IO[List[Order]] =
         IO(List(sampleOrder))
 
-      override def findBy(company: Company, orderNo: OrderNo): IO[Option[Order]] = ???
+      override def findBy(company: Company, orderNo: OrderNo): IO[Option[Order]] = IO.raiseError(new RuntimeException)
     }
 
     val sut = OrderHistoryRoutes.fromRepo(repo)
@@ -46,14 +46,16 @@ class OrderHistoryRoutesTest extends AnyFunSuite {
         ("orderNo", Json.fromString(sampleOrder.orderNo.value)),
         ("company", Json.fromString(sampleOrder.company.value)),
         ("email", Json.fromString(sampleOrder.email.value)),
-        ("lines",
-         Json.arr(
-           Json.obj(
-             ("lineNo", Json.fromInt(sampleOrder.lines.head.lineNo)),
-             ("itemId", Json.fromString(sampleOrder.lines.head.itemId.value)),
-             ("price", Json.fromBigDecimal(sampleOrder.lines.head.price.value))
-           )
-         ))
+        (
+          "lines",
+          Json.arr(
+            Json.obj(
+              ("lineNo", Json.fromInt(sampleOrder.lines.head.lineNo.value)),
+              ("itemId", Json.fromString(sampleOrder.lines.head.itemId.value)),
+              ("price", Json.fromBigDecimal(sampleOrder.lines.head.price.value))
+            )
+          )
+        )
       )
     )
 

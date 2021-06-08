@@ -2,7 +2,6 @@ package rabbit
 
 import cats.data.NonEmptyList
 import cats.effect.{ IO, Resource }
-import cats.implicits._
 import com.rabbitmq.client.ConnectionFactory
 import dev.profunktor.fs2rabbit.config.{ Fs2RabbitConfig, Fs2RabbitNodeConfig }
 import dev.profunktor.fs2rabbit.effects.EnvelopeDecoder
@@ -19,7 +18,7 @@ object Rabbit {
 
   object Config {
 
-    val load: IO[Fs2RabbitConfig] = IO {
+    val load: IO[Fs2RabbitConfig] = IO.delay {
       val virtualHost = "/"
       val rabbitEndpoints =
         Try(NonEmptyList.fromList(System.getenv("RABBIT_ENDPOINTS").split(",").map(_.trim).toList).get)

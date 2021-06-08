@@ -1,9 +1,9 @@
 package api
 
 import cats.effect.IO
-import data.params.Company.CompanyVar
-import data.params.Email.EmailQueryParam
-import data.params.OrderNo.OrderNoVar
+import data.Company.CompanyVar
+import data.Email.EmailQueryParam
+import data.OrderNo.OrderNoVar
 import data.params.PagingCritQueryParam
 import org.http4s.HttpRoutes
 import org.http4s.circe.CirceEntityEncoder._

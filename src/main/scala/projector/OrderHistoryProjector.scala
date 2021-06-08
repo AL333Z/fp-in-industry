@@ -4,9 +4,9 @@ import cats.effect.{ IO, Resource }
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
 import dev.profunktor.fs2rabbit.model.{ AckResult, AmqpEnvelope }
 import fs2.Stream
+import mongo.Mongo
 import org.typelevel.log4cats.Logger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import mongo.Mongo
 import projector.OrderHistoryProjector.{ Acker, Consumer }
 import projector.event.OrderCreatedEvent
 import rabbit.Rabbit
