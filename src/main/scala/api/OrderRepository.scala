@@ -8,7 +8,6 @@ import mongo4cats.database.MongoCollectionF
 
 trait OrderRepository {
   def findBy(email: Email, company: Company, pagingCriteria: PagingCriteria): IO[List[Order]]
-
   def findBy(company: Company, orderNo: OrderNo): IO[Option[Order]]
 }
 
@@ -29,9 +28,9 @@ object OrderRepository {
               Filters.eq("company", company.value)
             )
           )
-          .stream[IO] // TODO handle pagination, for real :)
-          .drop((pagingCriteria.pageNo.value * pagingCriteria.pageSize.value).longValue) // in the lib there's no skip...
-          .take(pagingCriteria.pageSize.value.longValue)
+          .skip(pagingCriteria.pageNo.value * pagingCriteria.pageSize.value)
+          .limit(pagingCriteria.pageSize.value)
+          .stream[IO]
           .compile
           .toList
 
