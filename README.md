@@ -14,14 +14,16 @@ You will then discover how there's no need to be a mathematician in order to be 
 
 # How to run
 
-- To bring up mongo and rabbit: `docker compose up`
-- Export these env var
-   - MONGO_USERNAME=root
-   - MONGO_PASSWORD=example
-   - RABBIT_USERNAME=guest
-   - RABBIT_PASSWORD=guest
-- run both applications: `sbt runMain api.OrderHistoryApp` and `sbt runMain projector.OrderHistoryProjectorApp`
-- now you can push any message to the [queue](http://localhost:15672/#/queues/%2F/EventsFromOms), e.g.
+- To bring up mongo and rabbit: `docker-compose up -d`
+- Export these env var:
+```
+export MONGO_USERNAME=root
+export MONGO_PASSWORD=example
+export RABBIT_USERNAME=guest
+export RABBIT_PASSWORD=guest
+```
+- run both applications: `sbt "runMain api.OrderHistoryApp"` and `sbt "runMain projector.OrderHistoryProjectorApp"`
+- now you can create the [queue](http://localhost:15672/#/queues/%2F/EventsFromOms) and push any message, e.g.
 ```json
 {
   "id": "001",
@@ -36,7 +38,7 @@ You will then discover how there's no need to be a mathematician in order to be 
   ]
 }
 ```
-- and query the api [api](http://localhost/ACME/orders?email=%22asdf@asdf.com%22)
+- and query the [api](http://localhost/ACME/orders?email=%22asdf@asdf.com%22)
 
 # How to run tests
 
