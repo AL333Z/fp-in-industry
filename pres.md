@@ -11,8 +11,9 @@ header-strong: #C44D58
 
 ### _Adopting FP In industry_
 
----
 
+---
+<!--
 # Who am I
 
 ## _@al333z_
@@ -23,6 +24,7 @@ header-strong: #C44D58
 ![right](pics/pic.jpg)
 
 ---
+-->
 
 # Why this talk?
 
@@ -47,7 +49,7 @@ header-strong: #C44D58
 
 ![Inline, 70%](pics/arch.png)
 
-- Let's assume we are provided with domain events from an Order Management Platform (e.g. OrderCreated), via a RabbitMQ broker
+- Let's assume we are provided with domain events from an Order Management Platform (e.g. OrderCreated, OrderShipped, etc..), via a RabbitMQ broker
 - We need to build an Order History Service
 
 ^ Talk ONLY about REQUIREMENTS!
@@ -59,8 +61,8 @@ header-strong: #C44D58
 
 ![Inline, 70%](pics/arch.png)
 
-- a component which projects a model, in a MongoDB collection
-- so that an HTTP service can queries the collection returning orders
+- a component which projects a (read) model, in a MongoDB collection
+- so that an HTTP service can query the collection returning orders
 
 ^ Talk ONLY about COMPONENTS!
 
@@ -70,10 +72,22 @@ header-strong: #C44D58
 
 Our focus here is **_NOT_** on the System Architecture
 
-We'll just put our attention on _implementing an architecture component_ (the projector) using Pure Functional Programming, in Scala
+We'll just put our attention on _implementing an architecture component_ (the projector) adopting _Functional Programming_ principles
 
 ---
 
+# Spoiler: 
+
+We WON'T be using:
+- `var`
+- `throw`
+- methods returning `Unit`
+- _poorly typed definitions_ (`Any`, `Object`, etc...)
+- _low level concurrency mechanisms_ (`Thread`, `Actor`, etc..)
+
+---
+
+<!--
 # Why Scala
 
 ---
@@ -92,6 +106,8 @@ We'll just put our attention on _implementing an architecture component_ (the pr
 - __mature ecosystem__ of FP libs (cats, cats-effects, fs2, circe, http4s, etc..)
 
 ---
+-->
+
 # Let's start
 ---
 [.background-color: #FFFFFF]
@@ -137,7 +153,7 @@ We'll just put our attention on _implementing an architecture component_ (the pr
 
 A value of type `IO[A]` is a computation that, when evaluated, can perform __effects__ before either
 - yielding exactly one _result_ a value of type `A`
-- raising a _failure_
+- raising a _failure_ (`Throwable`)
 
 ---
 
@@ -146,6 +162,100 @@ A value of type `IO[A]` is a computation that, when evaluated, can perform __eff
 - are *pure* and *immutable*
 - represents just a description of a *side effectful computation*
 - are not evaluated (_suspended_) until the **end of the world**
+- are not memoized
+- _respects referential transparency_
+
+---
+
+# Referential transparency
+
+> An expression may _be replaced_ by _its value_ (or anything having the same value) 
+> _without changing the result_ of the program
+
+---
+
+# Why do we need Referential transparency if it works anyway?
+
+[.column]
+
+[.code-highlight: none]
+[.code-highlight: 1-3]
+[.code-highlight: 5-10]
+[.code-highlight: 11-13]
+[.code-highlight: all]
+
+```scala
+def askInt(): Future[Int] = 
+  Future(println("Please, give me a number:"))
+    .flatMap(_ => Future(io.StdIn.readLine().toInt))
+
+def askTwoInt(): Future[(Int, Int)] =
+  for {
+    x <- askInt()
+    y <- askInt()
+  } yield (x , y)
+
+def program(): Future[Unit] =
+  askTwoInt()
+    .flatMap(pair => Future(println(s"Result: ${pair}")))
+```
+[.column]
+```
+> Output:
+> Please, give me a number:
+> 4
+> Please, give me a number:
+> 7
+> Result: (4,7)
+```
+
+---
+
+# Why do we need Referential transparency if it works anyway?
+
+[.column]
+
+[.code-highlight: none]
+[.code-highlight: 5-10]
+[.code-highlight: all]
+
+```scala
+def askInt(): Future[Int] = 
+  Future(println("Please, give me a number:"))
+    .flatMap(_ => Future(io.StdIn.readLine().toInt))
+
+def askTwoInt(): Future[(Int, Int)] =
+  val sameAsk = askInt()
+  for {
+    x <- sameAsk
+    y <- sameAsk
+  } yield (x , y)
+
+def program(): Future[Unit] =
+  askTwoInt()
+    .flatMap(pair => Future(println(s"Result: ${pair}")))
+```
+[.column]
+```
+> Output:
+> Please, give me a number:
+> 4
+> Result: (4,4)
+```
+
+We just wanted to reduce duplication through an extract var![^1]
+
+[^1]: Example gently stolen from my dear friend https://github.com/matteobaglini/onion-with-functional-programming
+
+---
+
+# Referential transparency
+
+- code easier to _reason about_ - less things to remember!
+- code easier to _refactor_
+- code easier to _compose_ 
+- we're already used to referential transparency since our _math_ lessons!
+- we're already using a lot of data types in a referential transparent manner (e.g. `Option`, `Try`, `Either`)!
 
 ---
 
@@ -271,13 +381,13 @@ Who's gonna **_run_** the suspended computation then?
 - as the single _entry point_ to a **pure** program.
 
 ```scala
-object OrderHistoryProjectorApp extends IOApp {
-  override def run(args: List[String]): IO[ExitCode] =
+object OrderHistoryProjectorApp extends IOApp.Simple {
+  override def run: IO[Unit] =
     for {
       mongoConfig  <- Mongo.Config.load
       rabbitConfig <- Rabbit.Config.load
       // TODO use configs to start the main logic!
-    } yield ExitCode.Success
+    } yield ()
 }
 ```
 ^ `IOApp` provides an **_interpreter_** which will evaluate the `IO` value returned by the `run` method, dealing with all the dirty details of the JVM runtime, so _*you don't have to*_!
@@ -800,9 +910,9 @@ object OrderHistoryProjector {
 # Main
 
 ```scala
-object OrderHistoryProjectorApp extends IOApp {
+object OrderHistoryProjectorApp extends IOApp.Simple {
 
-  def run(args: List[String]): IO[ExitCode] =
+  def run: IO[Unit] =
     for {
       mongoConfig  <- Mongo.Config.load
       rabbitConfig <- Rabbit.Config.load
@@ -811,7 +921,7 @@ object OrderHistoryProjectorApp extends IOApp {
             .fromConfigs(mongoConfig, rabbitConfig) // acquire the needed resources
             .use(_.project) // start to process the stream of events
 
-    } yield ExitCode.Success
+    } yield ()
 }
 ```
 
