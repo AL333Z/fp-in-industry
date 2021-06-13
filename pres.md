@@ -780,7 +780,7 @@ class OrderHistoryProjector(consumer: Consumer, acker: Acker, logger: Logger) {
 ---
 
 # 3. Interact with a MongoDB cluster
-Using the official `mongo-scala-driver`, which is *not* exposing purely functional apis..
+Using the official `mongo4cats`, a thin wrapper over the official mongodb driver which is exposes purely functional apis
 
 ---
 
@@ -797,14 +797,14 @@ Using the official `mongo-scala-driver`, which is *not* exposing purely function
 ```scala
 object Mongo {
   ...
-  def collectionFrom(conf: Config): Resource[Collection] = {
+  def collectionFrom(conf: Config): Resource[MongoCollection[Order]] = {
     val clientSettings = ??? // conf to mongo-scala-driver settings
 
     for {
-      client    <- Resource.fromAutoCloseable(IO.defer(MongoClient(clientSettings)))
-      unsafeCol =  client.getDatabase(conf.databaseName)
-                         .getCollection(conf.collectionName)
-    } yield new Collection(unsafeCol)
+      client     <- MongoClient.create(settings.build())
+      db         <- Resource.eval(client.getDatabase(conf.databaseName))
+      collection <- Resource.eval(db.getCollectionWithCirceCodecs[Order](conf.collectionName))
+    } yield collection
   }
 }
 ```
@@ -822,9 +822,9 @@ object Mongo {
 
 ---
 
-[.code-highlight: 1, 11]
+[.code-highlight: 1, 12]
 [.code-highlight: 2]
-[.code-highlight: 3-10]
+[.code-highlight: 3-11]
 [.code-highlight: all]
 
 # 3.2 Store the model to the given collection
@@ -832,14 +832,15 @@ object Mongo {
 ```scala 
 class EventRepository(collection: Collection) {
   def store(event: OrderCreatedEvent): IO[Unit] =
-    collection.insertOne( // using safe ops
-      Document(
-        "id"      -> event.id,
-        "company" -> event.company,
-        "email"   -> event.email,
-        "lines" -> event.lines.map(line => ...)
+    collection
+      .insertOne(
+        Order(
+          orderNo = OrderNo(event.id),
+          company = Company(event.company),
+          email = Email(event.email),
+          lines = event.lines.map(...)
+        )
       )
-    )
 }
 ```
 
@@ -996,6 +997,15 @@ object OrderHistoryProjectorApp extends IOApp.Simple {
 
 ---
 
+# There's a lot more to talk about
+
+- Concurrency, execution contexts
+- How to track and handle errors? 
+- Abstract the effect types?
+- Should be adopt monad transformers?
+
+---
+
 # Conclusions
 
 - a production-ready component in under 300 LOC
@@ -1020,13 +1030,14 @@ https://fs2-rabbit.profunktor.dev/
 ---
 
 # I've been lying to you
-#### _Stream, Resource and Fs2Rabbit are polymorphic in the effect type!_
+#### _Stream, Resource, RabbitClient and MongoCollection are polymorphic in the effect type!_
 
 In all the slides I always omitted the additional effect type parameter!
 
 
 - `Resource[F, A]`
 - `Stream[F, A]`
-- `Fs2Rabbit[F]`
+- `RabbitClient[F]`
+- `MongoCollection[F]`
 
 #### Polymorphism is great, but comes at a (learning) cost!
