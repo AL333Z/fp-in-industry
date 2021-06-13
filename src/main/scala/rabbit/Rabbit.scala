@@ -55,8 +55,13 @@ object Rabbit {
     decoder: EnvelopeDecoder[IO, Try[OrderCreatedEvent]]
   ): Resource[IO, (AckResult => IO[Unit], Stream[IO, AmqpEnvelope[Try[OrderCreatedEvent]]])] =
     for {
-      rabbitClient      <- RabbitClient.resource[IO](config)
-      channel           <- rabbitClient.createConnectionChannel
-      (acker, consumer) <- Resource.eval(rabbitClient.createAckerConsumer(QueueName("EventsFromOms"))(channel, decoder))
+      rabbitClient <- RabbitClient.resource[IO](config)
+      channel      <- rabbitClient.createConnectionChannel
+      (acker, consumer) <- Resource.eval(
+                            rabbitClient.createAckerConsumer(queueName = QueueName("EventsFromOms"))(
+                              channel = channel,
+                              decoder = decoder
+                            )
+                          )
     } yield (acker, consumer)
 }

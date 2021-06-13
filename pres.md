@@ -140,7 +140,44 @@ We WON'T be using:
 
 ---
 
+# 1. read a bunch of configs from the env
+
+```scala
+object Mongo {
+  case class Auth(username: String, password: String)
+  case class Config(auth: Auth, addresses: List[String], /*...*/)
+  
+  object Config {
+    // reading from env variables
+    lazy val get: Config = {
+        val user      = System.getenv("MONGO_USERNAME")
+        val password  = System.getenv("MONGO_PASSWORD")
+        //...reading other env vars ... //
+        Config(Auth(user, password), endpoints, port, db, collection)
+    }
+  }
+}
+```
+
+---
+
+# How to turn an API to be _functional<sup>TM</sup>_?
+
+---
+
+# How to turn an API to be _functional<sup>TM</sup>_?
+
+In most cases:
+> **wrap** the _impure types/operations_,
+> only **expose** a _safer_ version of its operations
+
+---
+
 # Can FP help us with **I/O** operations?
+
+---
+
+# Can FP help us with **side-effects**?
 
 ---
 
@@ -255,7 +292,16 @@ We just wanted to reduce duplication through an extract var![^1]
 - code easier to _refactor_
 - code easier to _compose_ 
 - we're already used to referential transparency since our _math_ lessons!
-- we're already using a lot of data types in a referential transparent manner (e.g. `Option`, `Try`, `Either`)!
+- we're already using a lot of data types in a referential transparent manner (e.g. `List`, `Option`, `Try`, `Either`)!
+
+---
+
+# How to turn an API to be _functional<sup>TM</sup>_?
+
+In most cases:
+> **wrap** the _impure types/operations_,
+> only **expose** a _safer_ version of its operations
+> which will need to be _referential transparent_
 
 ---
 
@@ -322,7 +368,7 @@ val program: IO[Unit] =
 [.code-highlight: 8-12]
 [.code-highlight: all]
 
-# 1. Read a bunch of configs from the env
+# 1. Read a bunch of configs from the env, made functional<sup>TM</sup>
 
 ```scala
 object Mongo {
@@ -425,9 +471,11 @@ Using `fs2-rabbit` lib which:
 ## Open a connection
 
 ```scala 
-val client: Fs2Rabbit = Fs2Rabbit(config)
-
-val channel: Resource[AMQPChannel] = client.createConnectionChannel
+val channel: Resource[AMQPChannel] = 
+  for {
+    rabbitClient <- RabbitClient.resource(config)
+    channel      <- rabbitClient.createConnectionChannel
+  } yield channel
 ```
 
 ## `Resource`?
@@ -442,7 +490,8 @@ val channel: Resource[AMQPChannel] = client.createConnectionChannel
 
 # Extremely helpful to write code that:
 - doesn't leak
-- handles properly terminal signals
+- handles properly terminal signals (e.g. `SIGTERM`) by default (no need to register a shutdown hook)
+- do the right thing by design
 
 ---
 
@@ -508,6 +557,8 @@ def mkResource(s: String): Resource[String] = {
 
 # Using a Resource
 
+[.column]
+
 ```scala
 val r: Resource[(String, String)] = 
   for {
@@ -515,18 +566,54 @@ val r: Resource[(String, String)] =
     inner <- mkResource("inner")
   } yield (outer, inner)
 
-r.use { case (a, b) => IO.delay(println(s"Using $a and $b")) } // IO[Unit]
+r.use { case (a, b) => 
+  IO.delay(println(s"Using $a and $b")) 
+} // IO[Unit]
 ```
+
+[.column]
 
 [.code-highlight: none]
 [.code-highlight: all]
 ```
 Output:
-Acquiring outer
-Acquiring inner
-Using outer and inner
-Releasing inner
-Releasing outer
+> Acquiring outer
+> Acquiring inner
+> Using outer and inner
+> Releasing inner
+> Releasing outer
+```
+
+---
+
+# Using a Resource
+
+[.column]
+
+```scala
+val sessionPool: Resource[MySessionPool] = 
+  for {
+    connection <- openConnection()
+    sessions   <- openSessionPool(connection)
+  } yield sessions
+
+sessionPool.use { sessions =>
+  // use sessions to do whatever things!
+}
+```
+
+[.column]
+
+[.code-highlight: none]
+[.code-highlight: all]
+
+```
+Output:
+> Acquiring connection
+> Acquiring sessions
+> Using sessions
+> Releasing sessions
+> Releasing connection
 ```
 
 ---
@@ -534,7 +621,15 @@ Releasing outer
 # Gotchas:
 - _Nested resources_ are released in *reverse order* of acquisition 
 - Easy to _lift_ an `AutoClosable` to `Resource`, via `Resource.fromAutoclosable`
+- Every time you need to use something which implements `AutoClosable`, you should really be using `Resource`!
 - You can _lift_ any `IO[A]` into a `Resource[A]` with a no-op release via `Resource.eval`
+
+---
+
+# Why not scala.util.Using?
+
+- not composable (no `map`, `flatMap`, etc...)
+- no support for properly handling effects
 
 ---
 
@@ -542,30 +637,30 @@ Releasing outer
 
 ---
 
+[.code-highlight: 3]
 [.code-highlight: 4]
 [.code-highlight: 6-10]
-[.code-highlight: 5-12]
-[.code-highlight: 13]
+[.code-highlight: 5-11]
+[.code-highlight: 12]
 [.code-highlight: all]
 
 # 2.1. Interact with a RabbitMQ broker
 
 ```scala
-val client: Fs2Rabbit = Fs2Rabbit(config)
+val rabbitDeps: Resource[(Acker, Consumer)] = 
+    for {
+      rabbitClient <- RabbitClient.resource[IO](config)
+      channel      <- rabbitClient.createConnectionChannel
+      (acker, consumer) <- Resource.eval(
+                            rabbitClient.createAckerConsumer(
+                              queueName = QueueName("EventsFromOms"),
+                              channel = channel,
+                              decoder = decoder
+                            ) // IO[(Acker, Consumer)]
+                          )
+    } yield (acker, consumer)
 
-val rabbitDeps: Resource[(Acker, Consumer)] = for {
-  channel <- client.createConnectionChannel // resource opening a connection to a channel
-  (acker, consumer) <- Resource.eval( // lift an IO which creates the consumer
-    client.createAckerConsumer[Try[OrderCreatedEvent]](
-      queueName = QueueName("EventsFromOms"),
-      basicQos = BasicQos(0, 10))(
-      channel = channel,
-      decoder = decoder
-    )
-  )
-} yield (acker, consumer)
-
-type Acker = AckResult => IO[Unit]
+type Acker    = AckResult => IO[Unit]
 type Consumer = Stream[AmqpEnvelope[Try[OrderCreatedEvent]]]
 ```
 
@@ -686,38 +781,6 @@ class OrderHistoryProjector(consumer: Consumer, acker: Acker, logger: Logger) {
 
 # 3. Interact with a MongoDB cluster
 Using the official `mongo-scala-driver`, which is *not* exposing purely functional apis..
-
----
-
-# How to turn an API to be _functional<sup>TM</sup>_?
-
----
-
-# How to turn an API to be _functional<sup>TM</sup>_?
-
-In most cases:
-- **wrap** the _impure type_ so that its operations are no more reachable
-- only **expose** a _safer_ version of its operations
-
----
-
-[.code-highlight: 1,2,9]
-[.code-highlight: 4-8]
-[.code-highlight: all]
-
-# "Wrap the crap"
-
-```scala
-class Collection(
-  private val wrapped: MongoCollection[Document]) {
-
-  def insertOne(document: Document): IO[Unit] =
-    wrapped
-      .insertOne(document)
-      .toIO // <- extension method converting to IO!
-      .void
-}
-```
 
 ---
 

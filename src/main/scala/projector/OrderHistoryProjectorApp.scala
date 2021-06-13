@@ -1,6 +1,6 @@
 package projector
 
-import cats.effect.{IO, IOApp}
+import cats.effect.{ IO, IOApp }
 import mongo.Mongo
 import rabbit.Rabbit
 
