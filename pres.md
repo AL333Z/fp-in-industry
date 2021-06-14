@@ -1,4 +1,5 @@
 autoscale: true
+<!--
 header: #FF6B6B
 footer-style: #C44D58
 text: #4ECDC4
@@ -6,7 +7,7 @@ text-emphasis: #FFFFFF
 text-strong: #C7F464
 header-emphasis: #C44D58
 header-strong: #C44D58
-
+-->
 ## (Im)practical Functional Programming
 
 ### _Adopting FP In industry_
@@ -45,7 +46,7 @@ header-strong: #C44D58
 
 [.background-color: #FFFFFF]
 
-# Sample Architecture: _Order History Service_
+# Sample Architecture: __Order History Service__
 
 ![Inline, 70%](pics/arch.png)
 
@@ -57,7 +58,7 @@ header-strong: #C44D58
 ---
 [.background-color: #FFFFFF]
 
-# Order History Service: _components_
+# Order History Service: __components__
 
 ![Inline, 70%](pics/arch.png)
 
@@ -188,8 +189,15 @@ In most cases:
 
 # Introducing IO
 
+- enable capturing and controlling actions - a.k.a _effects_ - that your program _wishes to perform_ within a _resource-safe_, _typed_ context with seamless support for _concurrency_ and _coordination_
+- these effects may be _asynchronous_ (callback-driven) or _synchronous_ (directly returning values); they may _return_ within microseconds or run _infinitely_.
+
+---
+
+# Introducing IO
+
 A value of type `IO[A]` is a computation that, when evaluated, can perform __effects__ before either
-- yielding exactly one _result_ a value of type `A`
+- yielding exactly one _result_: a value of type `A`
 - raising a _failure_ (`Throwable`)
 
 ---
@@ -200,7 +208,7 @@ A value of type `IO[A]` is a computation that, when evaluated, can perform __eff
 - represents just a description of a *side effectful computation*
 - are not evaluated (_suspended_) until the **end of the world**
 - are not memoized
-- _respects referential transparency_
+- respects _referential transparency_
 
 ---
 
@@ -237,6 +245,8 @@ def program(): Future[Unit] =
     .flatMap(pair => Future(println(s"Result: ${pair}")))
 ```
 [.column]
+[.code-highlight: none]
+[.code-highlight: all]
 ```
 > Output:
 > Please, give me a number:
@@ -273,6 +283,8 @@ def program(): Future[Unit] =
     .flatMap(pair => Future(println(s"Result: ${pair}")))
 ```
 [.column]
+[.code-highlight: none]
+[.code-highlight: all]
 ```
 > Output:
 > Please, give me a number:
@@ -288,7 +300,7 @@ We just wanted to reduce duplication through an extract var![^1]
 
 # Referential transparency
 
-- code easier to _reason about_ - less things to remember!
+- code easier to _reason about_
 - code easier to _refactor_
 - code easier to _compose_ 
 - we're already used to referential transparency since our _math_ lessons!
@@ -333,24 +345,33 @@ class IO[A] {
 
 # Composing sequential effects
 
-[.code-highlight: 1]
-[.code-highlight: 3-5]
-[.code-highlight: 3-6]
-[.code-highlight: 3-7]
-[.code-highlight: 3-9]
+[.column]
+[.code-highlight: 1-4]
+[.code-highlight: 7-8]
+[.code-highlight: 7-9]
+[.code-highlight: 7-11]
+[.code-highlight: 7-12]
 [.code-highlight: all]
 
 ```scala
-val ioInt: IO[Int] = IO.delay{ println("hello"); 1 }
+val ioInt: IO[Int] = IO.delay{ 
+  println("hello")
+  1 
+}
 
 val program: IO[Unit] =
  for {
     i1 <- ioInt
     _  <- IO.sleep(i1.second)
-    _  <- IO.raiseError(new RuntimeException("boom!")) // not throwing!
-    i2 <- ioInt // not executed, comps is short-circuted
+    _  <- IO.raiseError( // not throwing!
+            new RuntimeException("boom!")) 
+    i2 <- ioInt //comps is short-circuted
  } yield ()
-
+```
+[.column]
+[.code-highlight: none]
+[.code-highlight: all]
+```
 > Output:
 > hello
 > <...1 second...>
@@ -455,7 +476,7 @@ object OrderHistoryProjectorApp extends IOApp.Simple {
 
 Using `fs2-rabbit` lib which:
 - provides a _purely functional api_
-- let me introduce you a bunch of useful data types
+- let me introduce you a bunch of useful _data types_
 
 ---
 
@@ -491,7 +512,8 @@ val channel: Resource[AMQPChannel] =
 # Extremely helpful to write code that:
 - doesn't leak
 - handles properly terminal signals (e.g. `SIGTERM`) by default (no need to register a shutdown hook)
-- do the right thing by design
+- do _the right thing_<sup>TM</sup> by design
+- avoid the need to reboot a container every once in a while :)
 
 ---
 
@@ -637,31 +659,37 @@ Output:
 
 ---
 
-[.code-highlight: 3]
-[.code-highlight: 4]
-[.code-highlight: 6-10]
-[.code-highlight: 5-11]
-[.code-highlight: 12]
+[.code-highlight: 8]
+[.code-highlight: 9]
+[.code-highlight: 11-15]
+[.code-highlight: 10-16]
+[.code-highlight: 17]
 [.code-highlight: all]
 
 # 2.1. Interact with a RabbitMQ broker
 
 ```scala
-val rabbitDeps: Resource[(Acker, Consumer)] = 
-    for {
-      rabbitClient <- RabbitClient.resource[IO](config)
-      channel      <- rabbitClient.createConnectionChannel
-      (acker, consumer) <- Resource.eval(
-                            rabbitClient.createAckerConsumer(
-                              queueName = QueueName("EventsFromOms"),
-                              channel = channel,
-                              decoder = decoder
-                            ) // IO[(Acker, Consumer)]
-                          )
-    } yield (acker, consumer)
-
-type Acker    = AckResult => IO[Unit]
-type Consumer = Stream[AmqpEnvelope[Try[OrderCreatedEvent]]]
+object Rabbit {
+  //...
+  def consumerFrom(
+      config: Fs2RabbitConfig,
+      decoder: EnvelopeDecoder[IO, Try[OrderCreatedEvent]]
+    ): Resource[(Acker, Consumer)] = 
+      for {
+        rabbitClient <- RabbitClient.resource(config)
+        channel      <- rabbitClient.createConnectionChannel
+        (acker, consumer) <- Resource.eval(
+                              rabbitClient.createAckerConsumer(
+                                queueName = QueueName("EventsFromOms"),
+                                channel = channel,
+                                decoder = decoder
+                              ) // IO[(Acker, Consumer)]
+                            )
+      } yield (acker, consumer)
+  
+  type Acker    = AckResult => IO[Unit]
+  type Consumer = Stream[AmqpEnvelope[Try[OrderCreatedEvent]]]
+}
 ```
 
 ---
@@ -830,7 +858,7 @@ object Mongo {
 # 3.2 Store the model to the given collection
 
 ```scala 
-class EventRepository(collection: Collection) {
+class EventRepository(collection: MongoCollection[Order]) {
   def store(event: OrderCreatedEvent): IO[Unit] =
     collection
       .insertOne(
@@ -990,6 +1018,23 @@ object OrderHistoryProjectorApp extends IOApp.Simple {
 ```
 
 ---
+# Main
+
+```scala
+object OrderHistoryProjectorApp extends IOApp.Simple {
+
+  def run: IO[Unit] =
+    (Mongo.Config.load, Rabbit.Config.load).mapN {
+      case (mongoConfig, rabbitConfig) =>
+        OrderHistoryProjector
+          .fromConfigs(mongoConfig, rabbitConfig)
+          .use(_.project)
+    }
+
+}
+```
+
+---
 
 # All done!
 
@@ -999,10 +1044,10 @@ object OrderHistoryProjectorApp extends IOApp.Simple {
 
 # There's a lot more to talk about
 
-- Concurrency, execution contexts
-- How to track and handle errors? 
-- Abstract the effect types?
-- Should be adopt monad transformers?
+- How to handle concurrency, execution contexts, blocking ops?
+- How to track and handle errors?
+- What advanced technique should be really introduce?
+- Do we really nead advanced techniques?
 
 ---
 
