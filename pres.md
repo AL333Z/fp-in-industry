@@ -77,7 +77,7 @@ We'll just put our attention on _implementing an architecture component_ (the pr
 
 ---
 
-# Spoiler: 
+# Spoiler
 
 We WON'T be using:
 - `var`
@@ -118,7 +118,7 @@ We WON'T be using:
 ![Inline, 80%](pics/projector.png)
 
 - __Consume__ a stream of events from a RabbitMQ queue
-- __Persist__ a model to a MongoDB collection
+- __Persist__ a read model to a MongoDB collection
 
 ---
 
@@ -148,14 +148,12 @@ object Mongo {
   case class Auth(username: String, password: String)
   case class Config(auth: Auth, addresses: List[String], /*...*/)
   
-  object Config {
-    // reading from env variables
-    lazy val get: Config = {
-        val user      = System.getenv("MONGO_USERNAME")
-        val password  = System.getenv("MONGO_PASSWORD")
-        //...reading other env vars ... //
-        Config(Auth(user, password), endpoints, port, db, collection)
-    }
+  // reading from env variables
+  lazy val config: Config = {
+      val user      = System.getenv("MONGO_USERNAME")
+      val password  = System.getenv("MONGO_PASSWORD")
+      //...reading other env vars ... //
+      Config(Auth(user, password), endpoints, port, db, collection)
   }
 }
 ```
@@ -207,7 +205,6 @@ A value of type `IO[A]` is a computation that, when evaluated, can perform __eff
 - are *pure* and *immutable*
 - represents just a description of a *side effectful computation*
 - are not evaluated (_suspended_) until the **end of the world**
-- are not memoized
 - respects _referential transparency_
 
 ---
@@ -317,22 +314,30 @@ In most cases:
 
 ---
 
-[.code-highlight: none]
-[.code-highlight: 1-8]
-[.code-highlight: 9-15]
-[.code-highlight: all]
-
 # IO and combinators
+
+[.column]
+
+[.code-highlight: none]
+[.code-highlight: all]
 
 ```scala
 object IO {
   def delay[A](a: => A): IO[A]
   def pure[A](a: A): IO[A]
   def raiseError[A](e: Throwable): IO[A]
-  def sleep(duration: FiniteDuration): IO[Unit] 
+  def sleep(duration: FiniteDuration): IO[Unit]
+  def async[A](k: /* ... */): IO[A]
   ...
 }
+```
 
+[.column]
+
+[.code-highlight: none]
+[.code-highlight: all]
+
+```scala
 class IO[A] {
   def map[B](f: A => B): IO[B]
   def flatMap[B](f: A => IO[B]): IO[B]
@@ -354,10 +359,9 @@ class IO[A] {
 [.code-highlight: all]
 
 ```scala
-val ioInt: IO[Int] = IO.delay{ 
-  println("hello")
-  1 
-}
+val ioInt: IO[Int] = 
+  IO.delay { println("hello") }
+    .map(_ => 1)
 
 val program: IO[Unit] =
  for {
@@ -808,7 +812,7 @@ class OrderHistoryProjector(consumer: Consumer, acker: Acker, logger: Logger) {
 ---
 
 # 3. Interact with a MongoDB cluster
-Using the official `mongo4cats`, a thin wrapper over the official mongodb driver which is exposes purely functional apis
+Using `mongo4cats`, a thin wrapper over the official mongodb driver, which is exposes purely functional apis
 
 ---
 
@@ -916,7 +920,7 @@ class OrderHistoryProjector(eventRepo: EventRepository,
 
 # Wiring
 
-How to achieve _separation of concerns_?
+How to achieve _separation of concerns_ and have a good _modularity_?
 
 ---
 
@@ -925,7 +929,8 @@ How to achieve _separation of concerns_?
 ## **_Constructor Injection_**!
 
 - JVM application lifecycle is not so complex
-- `IO`, `IOApp`, `Resource`, `Stream` are handling properly termination events
+- **No need for magic**, each dependency can be explicitly injected
+- Acquiring/releasing resources should be handled as an *effect*
 
 ---
 
@@ -938,7 +943,7 @@ How to achieve _separation of concerns_?
 
 - a class with a **private constructor**
 - a companion object with a _`fromX/make`_ method (**smart constructor**)
-  1. taking deps as input
+  1. taking dependencies as input
   2. usually returning `IO`/`Resource` of the component class
  
 [.footer: My view of Constructor Injection for effectful applications]
@@ -963,7 +968,7 @@ class OrderHistoryProjector private (
 
 object OrderHistoryProjector {
   def fromConfigs(mongoConfig: Mongo.Config,
-                  rabbitConfig: Fs2RabbitConfig
+                  rabbitConfig: Rabbit.Config
   ): Resource[OrderHistoryProjector] = ...
 }
 ```
@@ -979,27 +984,20 @@ object OrderHistoryProjector {
     rabbitConfig: Fs2RabbitConfig
   ): Resource[OrderHistoryProjector] =
     for {
-      logger            <- Resource.eval(Slf4jLogger.create)
       (acker, consumer) <- Rabbit.consumerFrom(rabbitConfig, eventDecoder)
       collection        <- Mongo.collectionFrom(mongoConfig)
       repo               = EventRepository.fromCollection(collection)
+      logger            <- Resource.eval(Slf4jLogger.create)
     } yield new OrderHistoryProjector(repo, consumer, acker, logger)
 }
 ```
 
 ---
 
-# Constructor Injection
-
-- **No magic**, each dependency is explicitly injected
-- Acquiring/releasing resources is handled as an *effect*
-
----
-
 [.code-highlight: 8-10]
 [.code-highlight: all]
 
-# Main
+# Wiring - Main
 
 ```scala
 object OrderHistoryProjectorApp extends IOApp.Simple {
@@ -1018,23 +1016,6 @@ object OrderHistoryProjectorApp extends IOApp.Simple {
 ```
 
 ---
-# Main
-
-```scala
-object OrderHistoryProjectorApp extends IOApp.Simple {
-
-  def run: IO[Unit] =
-    (Mongo.Config.load, Rabbit.Config.load).mapN {
-      case (mongoConfig, rabbitConfig) =>
-        OrderHistoryProjector
-          .fromConfigs(mongoConfig, rabbitConfig)
-          .use(_.project)
-    }
-
-}
-```
-
----
 
 # All done!
 
@@ -1046,8 +1027,7 @@ object OrderHistoryProjectorApp extends IOApp.Simple {
 
 - How to handle concurrency, execution contexts, blocking ops?
 - How to track and handle errors?
-- What advanced technique should be really introduce?
-- Do we really nead advanced techniques?
+- Do we really need advanced techniques?
 
 ---
 
@@ -1056,7 +1036,7 @@ object OrderHistoryProjectorApp extends IOApp.Simple {
 - a production-ready component in under 300 LOC
 - only _3 main datatypes_: `IO`, `Resource`, `Stream`
 - no _variables_, no _mutable state_
-- no ivory tower
+- not even the M word!
 - __I could have written almost the same code in Kotlin, Swift or.. Haskell!__
 
 ---
